@@ -30,17 +30,23 @@ int main(int argc, char **argv)
 
         // Required parameters
         po::options_description required_configs("Required");
+        // **--data_type**: The type of dataset you wish to build an index on. float(32 bit), signed int8 and unsigned uint8 are supported.
         required_configs.add_options()("data_type", po::value<std::string>(&data_type)->required(),
                                        program_options_utils::DATA_TYPE_DESCRIPTION);
+        // **--dist_fn**: Three distance functions are supported: cosine distance, minimum Euclidean distance (l2) and maximum inner product (mips).
         required_configs.add_options()("dist_fn", po::value<std::string>(&dist_fn)->required(),
                                        program_options_utils::DISTANCE_FUNCTION_DESCRIPTION);
+        // **--index_path_prefix**: the index will span a few files, all beginning with the specified prefix path. For example, if you provide `~/index_test` as the prefix path, build  generates files such as `~/index_test_pq_pivots.bin, ~/index_test_pq_compressed.bin, ~/index_test_disk.index, ...`. There may be between 8 and 10 files generated with this prefix depending on how the index is constructed.
         required_configs.add_options()("index_path_prefix", po::value<std::string>(&index_path_prefix)->required(),
                                        program_options_utils::INDEX_PATH_PREFIX_DESCRIPTION);
+        // **--data_file**: The input data over which to build an index, in .bin format. The first 4 bytes represent number of points as an integer. The next 4 bytes represent the dimension of data as an integer. The following `n*d*sizeof(T)` bytes contain the contents of the data one data point in time. `sizeof(T)` is 1 for byte indices, and 4 for float indices. This will be read by the program as int8_t for signed indices, uint8_t for unsigned indices or float for float indices.
         required_configs.add_options()("data_path", po::value<std::string>(&data_path)->required(),
                                        program_options_utils::INPUT_DATA_PATH);
+        // **-B (--search_DRAM_budget)**: bound on the memory footprint of the index at search time in GB. Once built, the index will use up only the specified RAM limit, the rest will reside on disk. This will dictate how aggressively we compress the data vectors to store in memory. Larger will yield better performance at search time. For an n point index, to use b byte PQ compressed representation in memory, use `B = ((n * b) / 2^30  + (250000*(4*R + sizeof(T)*ndim)) / 2^30)`. The second term in the summation is to allow some buffer for caching about 250,000 nodes from the graph in memory while serving.  If you are not sure about this term, add 0.25GB to the first term. 
         required_configs.add_options()("search_DRAM_budget,B", po::value<float>(&B)->required(),
                                        "DRAM budget in GB for searching the index to set the "
                                        "compressed level for data while search happens");
+        // **-M (--build_DRAM_budget)**: Limit on the memory allowed for building the index in GB. If you specify a value less than what is required to build the index in one pass, the index is  built using a divide and conquer approach so that  sub-graphs will fit in the RAM budget. The sub-graphs are overlayed to build the overall index. This approach can be upto 1.5 times slower than building the index in one shot. Allocate as much memory as your RAM allows.
         required_configs.add_options()("build_DRAM_budget,M", po::value<float>(&M)->required(),
                                        "DRAM budget in GB for building the index");
 
@@ -57,14 +63,17 @@ int main(int argc, char **argv)
                                        " Quantized Dimension for compression");
         optional_configs.add_options()("codebook_prefix", po::value<std::string>(&codebook_prefix)->default_value(""),
                                        "Path prefix for pre-trained codebook");
+        // --PQ_disk_bytes  (default is 0): Use 0 to store uncompressed data on SSD. This allows the index to asymptote to 100% recall. If your vectors are too large to store in SSD, this parameter provides the option to compress the vectors using PQ for storing on SSD. This will trade off recall. You would also want this to be greater than the number of bytes used for the PQ compressed data stored in-memory
         optional_configs.add_options()("PQ_disk_bytes", po::value<uint32_t>(&disk_PQ)->default_value(0),
                                        "Number of bytes to which vectors should be compressed "
                                        "on SSD; 0 for no compression");
         optional_configs.add_options()("append_reorder_data", po::bool_switch()->default_value(false),
                                        "Include full precision data in the index. Use only in "
                                        "conjuction with compressed data on SSD.");
+        // --build_PQ_bytes (default is 0): Set to a positive value less than the dimensionality of the data to enable faster index build with PQ based distance comparisons
         optional_configs.add_options()("build_PQ_bytes", po::value<uint32_t>(&build_PQ)->default_value(0),
                                        program_options_utils::BUIlD_GRAPH_PQ_BYTES);
+        // --use_opq: use the flag to use OPQ rather than PQ compression. OPQ is more space efficient for some high dimensional datasets, but also needs a bit more build time.
         optional_configs.add_options()("use_opq", po::bool_switch()->default_value(false),
                                        program_options_utils::USE_OPQ);
         optional_configs.add_options()("label_file", po::value<std::string>(&label_file)->default_value(""),
@@ -103,6 +112,8 @@ int main(int argc, char **argv)
 
     bool use_filters = (label_file != "") ? true : false;
     diskann::Metric metric;
+
+    // l2指的是欧氏距离，mips指的是内积距离，cosine指的是余弦距离
     if (dist_fn == std::string("l2"))
         metric = diskann::Metric::L2;
     else if (dist_fn == std::string("mips"))
@@ -133,6 +144,18 @@ int main(int argc, char **argv)
         }
     }
 
+    // params 包括的参数有：R, L, B, M, num_threads, disk_PQ, append_reorder_data, build_PQ, QD
+    /*
+    * R (max degree)\n"
+    * L (indexing list size, better if >= R)\n"
+    * B (RAM limit of final index in GB)\n"
+    * M (memory limit while indexing)\n"
+    * T (number of threads for indexing)\n"
+    * B' (PQ bytes for disk index: optional parameter for very large dimensional data)\n"
+    * reorder (set true to include full precision in data file: optional paramter, use only when using disk PQ)\n"
+    * build_PQ_byte (number of PQ bytes for inde build; set 0 to use full precision vectors)\n"
+    * QD Quantized Dimension to overwrite the derived dim from B
+    */
     std::string params = std::string(std::to_string(R)) + " " + std::string(std::to_string(L)) + " " +
                          std::string(std::to_string(B)) + " " + std::string(std::to_string(M)) + " " +
                          std::string(std::to_string(num_threads)) + " " + std::string(std::to_string(disk_PQ)) + " " +

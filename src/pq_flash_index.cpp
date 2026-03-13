@@ -210,15 +210,18 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     size_t num_cached_nodes = node_list.size();
 
     // Allocate space for neighborhood cache
+    // neighborhood cache 的大小取决于要缓存的节点数和每个节点的最大度数（即邻居数量）。对于每个要缓存的节点，我们需要为其邻居列表分配空间，邻居列表的长度由 _max_degree 决定。加1是为了存储邻居数量本身。
     _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
     memset(_nhood_cache_buf, 0, num_cached_nodes * (_max_degree + 1));
 
     // Allocate space for coordinate cache
+    // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时。
     size_t coord_cache_buf_len = num_cached_nodes * _aligned_dim;
     diskann::alloc_aligned((void **)&_coord_cache_buf, coord_cache_buf_len * sizeof(T), 8 * sizeof(T));
     memset(_coord_cache_buf, 0, coord_cache_buf_len * sizeof(T));
 
     size_t BLOCK_SIZE = 8;
+    // block 数量是要缓存的节点数除以每个 block 的大小（即 BLOCK_SIZE）。每个 block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一个 block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍。
     size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
     for (size_t block = 0; block < num_blocks; block++)
     {

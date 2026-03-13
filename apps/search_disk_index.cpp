@@ -119,6 +119,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         return res;
     }
 
+    // 用 bfs 算法确定要 aching 的节点列表，优先缓存距离 medoid(s) 较近的节点
     std::vector<uint32_t> node_list;
     diskann::cout << "Caching " << num_nodes_to_cache << " nodes around medoid(s)" << std::endl;
     _pFlashIndex->cache_bfs_levels(num_nodes_to_cache, node_list);
@@ -135,6 +136,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     uint64_t warmup_num = 0, warmup_dim = 0, warmup_aligned_dim = 0;
     T *warmup = nullptr;
 
+    // 前面的cache_bfs_levels函数已经确定了要缓存哪些节点。这里的WARMUP不知道有什么用，难道是再刷一遍系统缓存？
     if (WARMUP)
     {
         if (file_exists(warmup_query_file))

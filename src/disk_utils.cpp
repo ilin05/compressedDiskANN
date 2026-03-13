@@ -640,6 +640,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
     // TODO: Make this honest when there is filter support
     if (full_index_ram < ram_budget * 1024 * 1024 * 1024)
     {
+        // 如果 M 充足，系统会在内存中一次性构建全量数据的 Vamana 图
         diskann::cout << "Full index fits in RAM budget, should consume at most "
                       << full_index_ram / (1024 * 1024 * 1024) << "GiBs, so building in one shot" << std::endl;
 
@@ -687,6 +688,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
     std::string merged_index_prefix = mem_index_path + "_tempFiles";
 
     Timer timer;
+    // M 较小，无法装下所有向量，DiskANN底层采用分治法：通过KMeans将数据且分为多个重叠的子簇(shards)，逐个为分块构建局部的 Vamana 子图，最终将其合并成一个全局图
     int num_parts =
         partition_with_ram_budget<T>(base_file, sampling_rate, ram_budget, 2 * R / 3, merged_index_prefix, 2);
     diskann::cout << timer.elapsed_seconds_for_step("partitioning data ") << std::endl;
@@ -1146,6 +1148,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     // if there is a 6th parameter, it means we compress the disk index
     // vectors also using PQ data (for very large dimensionality data). If the
     // provided parameter is 0, it means we store full vectors.
+    // 一般情况下，PQ_disk_bytes 设为0，我们在磁盘上存储完整向量即可
     if (param_list.size() > 5)
     {
         disk_pq_dims = atoi(param_list[5].c_str());
@@ -1204,6 +1207,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     // output a new base file which contains extra dimension with sqrt(1 -
     // ||x||^2/M^2) for every x, M is max norm of all points. Extra space on
     // disk needed!
+    // 如果是L2欧氏距离，则不需要预处理，直接使用原始数据文件；如果是内积或余弦相似度，则需要预处理数据文件，生成一个新的数据文件，增加一个维度来存储预处理后的值。预处理后的数据文件会被用来构建索引，因此需要确保磁盘上有足够的空间来存储这个新的数据文件。
     if (compareMetric == diskann::Metric::INNER_PRODUCT)
     {
         Timer timer;
@@ -1232,10 +1236,10 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
         created_temp_file_for_processed_data = true;
     }
 
-    uint32_t R = (uint32_t)atoi(param_list[0].c_str());
-    uint32_t L = (uint32_t)atoi(param_list[1].c_str());
+    uint32_t R = (uint32_t)atoi(param_list[0].c_str()); // max degree of graph
+    uint32_t L = (uint32_t)atoi(param_list[1].c_str()); // indexing list size, better if >= R
 
-    double final_index_ram_limit = get_memory_budget(param_list[2]);
+    double final_index_ram_limit = get_memory_budget(param_list[2]);    // RAM limit for final index in GB, need to be > 0 for build to happen
     if (final_index_ram_limit <= 0)
     {
         std::cerr << "Insufficient memory budget (or string was not in right "
@@ -1294,6 +1298,8 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
         generate_disk_quantized_data<T>(data_file_to_use, disk_pq_pivots_path, disk_pq_compressed_vectors_path,
                                         compareMetric, p_val, disk_pq_dims);
     }
+    
+    // 根据向量总数和指定的 B (搜索时DRAM限制) 来估算每个向量可以占用的字节数
     size_t num_pq_chunks = (size_t)(std::floor)(uint64_t(final_index_ram_limit / points_num));
 
     num_pq_chunks = num_pq_chunks <= 0 ? 1 : num_pq_chunks;
@@ -1311,6 +1317,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     diskann::cout << "Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
                   << std::endl;
 
+    // 对原始数据进行 PQ 训练并生成中心点 (_pq_pivots.bin)，同时生成各节点压缩后的向量文件 (_pq_compressed.bin)。查询时，该压缩数据将一直常驻在内存中
     generate_quantized_data<T>(data_file_to_use, pq_pivots_path, pq_compressed_vectors_path, compareMetric, p_val,
                                num_pq_chunks, use_opq, codebook_prefix);
     diskann::cout << timer.elapsed_seconds_for_step("generating quantized data") << std::endl;
@@ -1322,6 +1329,8 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
 #endif
     // Whether it is cosine or inner product, we still L2 metric due to the pre-processing.
     timer.reset();
+
+    // 构建Vamana图索引（基于M的分块与合并）
     diskann::build_merged_vamana_index<T, LabelT>(data_file_to_use.c_str(), diskann::Metric::L2, L, R, p_val,
                                                   indexing_ram_budget, mem_index_path, medoids_path, centroids_path,
                                                   build_pq_bytes, use_opq, num_threads, use_filters, labels_file_to_use,
@@ -1331,6 +1340,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     timer.reset();
     if (!use_disk_pq)
     {
+        // 调用 create_disk_layout 方法，将上一步生成的全量内存图结构 (_mem.index) 与全精度的原始向量文件按页（Page）对齐的方式交替重组
         diskann::create_disk_layout<T>(data_file_to_use.c_str(), mem_index_path, disk_index_path);
     }
     else
