@@ -232,7 +232,6 @@ template <typename data_t> location_t InMemDataStore<data_t>::load_impl(AlignedF
 
 template <typename data_t> location_t InMemDataStore<data_t>::load_impl(const std::string &filename)
 {
-    size_t file_dim, file_num_points;
     if (!file_exists(filename))
     {
         std::stringstream stream;
@@ -240,7 +239,15 @@ template <typename data_t> location_t InMemDataStore<data_t>::load_impl(const st
         diskann::cerr << stream.str() << std::endl;
         throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__, __LINE__);
     }
-    diskann::get_bin_metadata(filename, file_num_points, file_dim);
+
+    std::ifstream reader(filename, std::ios::binary);
+    if (!reader.is_open())
+        throw diskann::ANNException("ERROR: Could not open " + filename + " for reading", -1);
+
+    uint32_t file_num_points;
+    uint32_t file_dim;
+    reader.read((char*)&file_num_points, sizeof(uint32_t));
+    reader.read((char*)&file_dim, sizeof(uint32_t));
 
     if (file_dim != this->_dim)
     {
@@ -256,36 +263,52 @@ template <typename data_t> location_t InMemDataStore<data_t>::load_impl(const st
         this->resize((location_t)file_num_points);
     }
 
-    // Allocate temporary buffer for uncompressed data
-    data_t* temp_data;
-    alloc_aligned(((void **)&temp_data), file_num_points * _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
-    std::memset(temp_data, 0, file_num_points * _aligned_dim * sizeof(data_t));
-
-    copy_aligned_data_from_file<data_t>(filename.c_str(), temp_data, file_num_points, file_dim, _aligned_dim);
-
-    for (location_t i = 0; i < file_num_points; ++i) {
-        encode_and_store(temp_data + i * _aligned_dim, i);
+    size_t num_offsets;
+    reader.read((char*)&num_offsets, sizeof(size_t));
+    _vector_offsets.resize(num_offsets);
+    if (num_offsets > 0) {
+        reader.read((char*)_vector_offsets.data(), num_offsets * sizeof(size_t));
     }
 
-    aligned_free(temp_data);
+    size_t comp_size;
+    reader.read((char*)&comp_size, sizeof(size_t));
+    _compressed_data.resize(comp_size);
+    if (comp_size > 0) {
+        reader.read((char*)_compressed_data.data(), comp_size * sizeof(uint8_t));
+    }
 
+    reader.close();
     return (location_t)file_num_points;
 }
 
 template <typename data_t> size_t InMemDataStore<data_t>::save(const std::string &filename, const location_t num_points)
 {
-    // decode all vectors to dump
-    data_t* temp_data;
-    alloc_aligned(((void **)&temp_data), num_points * _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
-    std::memset(temp_data, 0, num_points * _aligned_dim * sizeof(data_t));
+    std::ofstream writer(filename, std::ios::binary);
+    if (!writer.is_open())
+        throw diskann::ANNException("ERROR: Could not open " + filename + " for writing", -1);
+    
+    // Header
+    uint32_t npts = num_points;
+    uint32_t dim_dummy = this->_dim;
+    writer.write((char*)&npts, sizeof(uint32_t));
+    writer.write((char*)&dim_dummy, sizeof(uint32_t));
 
-    for (location_t i = 0; i < num_points; ++i) {
-        decode_vector(i, temp_data + i * _aligned_dim);
+    // offsets table
+    size_t num_offsets = _vector_offsets.size();
+    writer.write((char*)&num_offsets, sizeof(size_t));
+    if (num_offsets > 0) {
+        writer.write((char*)_vector_offsets.data(), num_offsets * sizeof(size_t));
     }
 
-    size_t result = save_data_in_base_dimensions(filename, temp_data, num_points, this->get_dims(), this->get_aligned_dim(), 0U);
-    aligned_free(temp_data);
-    return result;
+    // compressed data
+    size_t comp_size = _compressed_data.size();
+    writer.write((char*)&comp_size, sizeof(size_t));
+    if (comp_size > 0) {
+        writer.write((char*)_compressed_data.data(), comp_size * sizeof(uint8_t));
+    }
+
+    writer.close();
+    return num_points;
 }
 
 template <typename data_t> void InMemDataStore<data_t>::populate_data(const data_t *vectors, const location_t num_pts)
@@ -326,37 +349,50 @@ template <typename data_t> void InMemDataStore<data_t>::populate_data(const std:
         throw diskann::ANNException(ss.str(), -1);
     }
 
-    data_t* temp_data;
-    alloc_aligned(((void **)&temp_data), npts * _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
-    std::memset(temp_data, 0, npts * _aligned_dim * sizeof(data_t));
-
-    copy_aligned_data_from_file(filename.c_str(), temp_data, npts, ndim, _aligned_dim, offset);
-
     _compressed_data.clear();
     _vector_offsets.clear();
     _vector_offsets.resize(npts, 0);
 
-    for (location_t i = 0; i < npts; ++i) {
-        encode_and_store(temp_data + i * _aligned_dim, i);
+    data_t* temp_vec;
+    alloc_aligned(((void **)&temp_vec), _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
+    std::memset(temp_vec, 0, _aligned_dim * sizeof(data_t));
+
+    std::ifstream reader(filename, std::ios::binary);
+    reader.seekg(offset + 8, std::ios::beg); // Skip header
+
+    for (size_t i = 0; i < npts; ++i) {
+        reader.read((char*)temp_vec, ndim * sizeof(data_t));
+        std::memset(temp_vec + ndim, 0, (_aligned_dim - ndim) * sizeof(data_t));
+        encode_and_store(temp_vec, i);
     }
 
-    aligned_free(temp_data);
+    aligned_free(temp_vec);
+    reader.close();
 }
 
 template <typename data_t>
 void InMemDataStore<data_t>::extract_data_to_bin(const std::string &filename, const location_t num_points)
 {
-    // decode all vectors to dump
-    data_t* temp_data;
-    alloc_aligned(((void **)&temp_data), num_points * _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
-    std::memset(temp_data, 0, num_points * _aligned_dim * sizeof(data_t));
+    std::ofstream writer(filename, std::ios::binary);
+    if (!writer.is_open())
+        throw diskann::ANNException("ERROR: Could not open " + filename + " for writing", -1);
+
+    uint32_t npts = num_points;
+    uint32_t ndim = this->_dim;
+    writer.write((char*)&npts, sizeof(uint32_t));
+    writer.write((char*)&ndim, sizeof(uint32_t));
+
+    data_t* temp_vec;
+    alloc_aligned(((void **)&temp_vec), _aligned_dim * sizeof(data_t), 8 * sizeof(data_t));
+    std::memset(temp_vec, 0, _aligned_dim * sizeof(data_t));
 
     for (location_t i = 0; i < num_points; ++i) {
-        decode_vector(i, temp_data + i * _aligned_dim);
+        decode_vector(i, temp_vec);
+        writer.write((char*)temp_vec, ndim * sizeof(data_t));
     }
 
-    save_data_in_base_dimensions(filename, temp_data, num_points, this->get_dims(), this->get_aligned_dim(), 0U);
-    aligned_free(temp_data);
+    aligned_free(temp_vec);
+    writer.close();
 }
 
 template <typename data_t> void InMemDataStore<data_t>::get_vector(const location_t i, data_t *dest) const
