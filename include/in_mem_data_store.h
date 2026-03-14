@@ -71,8 +71,16 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
     virtual location_t load_impl(AlignedFileReader &reader);
 #endif
 
+    // [New] Simplified pseudo-compression/decompression methods
+    void encode_and_store(const data_t *uncompressed_vec, location_t loc);
+    void decode_vector(location_t loc, data_t *out_vec) const;
+
   private:
     data_t *_data = nullptr;
+    
+    // [New] Structures for variable-length compression data
+    std::vector<uint8_t> _compressed_data;
+    std::vector<size_t> _vector_offsets;
 
     size_t _aligned_dim;
 
