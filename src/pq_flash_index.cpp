@@ -379,7 +379,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     
     _compressed_coord_cache.clear();
 
-    // block 数量是要缓存的节点数除以每个 block 的大小（�?BLOCK_SIZE）。每�?block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一�?block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍�?    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
+    // calculate blocks
+    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
     for (size_t block = 0; block < num_blocks; block++)
     {
         size_t start_idx = block * BLOCK_SIZE;
