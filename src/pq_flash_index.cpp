@@ -370,6 +370,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     // Allocate space for coordinate cache
     // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时�?    size_t BLOCK_SIZE = 8;
     // Allocate temporary space for coordinate cache reading
+    size_t BLOCK_SIZE = 8;
     T* temp_coord_cache_buf;
     size_t bytes_per_node = std::max((size_t)(_aligned_dim * sizeof(T)), (size_t)_disk_bytes_per_point);
     size_t temp_coord_cache_buf_len = BLOCK_SIZE * (bytes_per_node / sizeof(T) + 1);
@@ -378,7 +379,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     
     _compressed_coord_cache.clear();
 
-    // block 数量是要缓存的节点数除以每个 block 的大小（�?BLOCK_SIZE）。每�?block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一�?block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍�?    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
+    // block 数量是要缓存的节点数除以每个 block 的大小（�?BLOCK_SIZE）。每�?block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一�?block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍�?    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
     for (size_t block = 0; block < num_blocks; block++)
     {
         size_t start_idx = block * BLOCK_SIZE;
