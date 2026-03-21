@@ -28,6 +28,161 @@
 namespace diskann
 {
 
+namespace
+{
+    struct FlashBitWriter {
+        std::vector<uint8_t>& buf;
+        uint8_t cur_byte = 0;
+        int bit_pos = 0;
+
+        FlashBitWriter(std::vector<uint8_t>& b) : buf(b) {}
+        void write(uint64_t val, int bits) {
+            for (int i = 0; i < bits; ++i) {
+                uint8_t b = (val >> i) & 1;
+                cur_byte |= (b << bit_pos);
+                bit_pos++;
+                if (bit_pos == 8) {
+                    buf.push_back(cur_byte);
+                    cur_byte = 0;
+                    bit_pos = 0;
+                }
+            }
+        }
+        void flush() {
+            if (bit_pos > 0) {
+                buf.push_back(cur_byte);
+                cur_byte = 0;
+                bit_pos = 0;
+            }
+        }
+    };
+
+    struct FlashBitReader {
+        const uint8_t* buf;
+        size_t byte_pos = 0;
+        int bit_pos = 0;
+
+        FlashBitReader(const uint8_t* b) : buf(b) {}
+        uint64_t read(int bits) {
+            uint64_t val = 0;
+            for (int i = 0; i < bits; ++i) {
+                uint64_t b = (buf[byte_pos] >> bit_pos) & 1;
+                val |= (b << i);
+                bit_pos++;
+                if (bit_pos == 8) {
+                    byte_pos++;
+                    bit_pos = 0;
+                }
+            }
+            return val;
+        }
+    };
+
+    inline int get_flash_bit_width(uint64_t n) {
+        if (n == 0) return 0;
+        int bits = 0;
+        while (n > 0) {
+            n >>= 1;
+            bits++;
+        }
+        return bits;
+    }
+
+    template <typename T>
+    void flash_encode_and_store(const T *uncompressed_vec, size_t dim, std::vector<uint8_t>& out_temp)
+    {
+        FlashBitWriter writer(out_temp);
+
+        if constexpr (std::is_same_v<T, float>) {
+            int selected_exp = 16;
+            for (int exp = 0; exp <= 16; ++exp) {
+                double factor = std::pow(10.0, exp);
+                double inv_factor = 1.0 / factor;
+                bool ok = true;
+                for (size_t i = 0; i < dim; ++i) {
+                    double origin = uncompressed_vec[i];
+                    double reconstructed = std::round(origin * factor) * inv_factor;
+                    if (std::abs(origin - reconstructed) > 1e-4) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) {
+                    selected_exp = exp;
+                    break;
+                }
+            }
+            writer.write((uint64_t)selected_exp, 8);
+            double factor = std::pow(10.0, selected_exp);
+            int64_t min_val = INT64_MAX;
+            int64_t max_val = INT64_MIN;
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t val = (int64_t)std::llround(uncompressed_vec[i] * factor);
+                if (val < min_val) min_val = val;
+                if (val > max_val) max_val = val;
+            }
+            uint64_t range = (uint64_t)(max_val - min_val);
+            int bit_width = get_flash_bit_width(range);
+            writer.write((uint64_t)bit_width, 8);
+            writer.write((uint64_t)min_val, 64);
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t val = (int64_t)std::llround(uncompressed_vec[i] * factor);
+                writer.write((uint64_t)(val - min_val), bit_width);
+            }
+        } else {
+            int64_t min_val = INT64_MAX;
+            int64_t max_val = INT64_MIN;
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t val = (int64_t)uncompressed_vec[i];
+                if (val < min_val) min_val = val;
+                if (val > max_val) max_val = val;
+            }
+            uint64_t range = (uint64_t)(max_val - min_val);
+            int bit_width = get_flash_bit_width(range);
+            writer.write((uint64_t)bit_width, 8);
+            writer.write((uint64_t)min_val, 64);
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t val = (int64_t)uncompressed_vec[i];
+                writer.write((uint64_t)(val - min_val), bit_width);
+            }
+        }
+        writer.flush();
+    }
+
+    template <typename T>
+    void flash_decode_vector(const uint8_t* compressed_ptr, size_t dim, size_t aligned_dim, T *out_vec)
+    {
+        FlashBitReader reader(compressed_ptr);
+
+        if constexpr (std::is_same_v<T, float>) {
+            int exp = reader.read(8);
+            int bit_width = reader.read(8);
+            int64_t min_val = (int64_t)reader.read(64);
+            double factor = std::pow(10.0, -exp);
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t delta = (int64_t)reader.read(bit_width);
+                int64_t val = min_val + delta;
+                out_vec[i] = static_cast<float>(val * factor);
+            }
+            // Zero out the remaining aligned dimensions
+            for (size_t i = dim; i < aligned_dim; ++i) {
+                out_vec[i] = 0;
+            }
+        } else {
+            int bit_width = reader.read(8);
+            int64_t min_val = (int64_t)reader.read(64);
+            for (size_t i = 0; i < dim; ++i) {
+                int64_t delta = (int64_t)reader.read(bit_width);
+                int64_t val = min_val + delta;
+                out_vec[i] = static_cast<T>(val);
+            }
+            for (size_t i = dim; i < aligned_dim; ++i) {
+                out_vec[i] = 0;
+            }
+        }
+    }
+}
+
 template <typename T, typename LabelT>
 PQFlashIndex<T, LabelT>::PQFlashIndex(std::shared_ptr<AlignedFileReader> &fileReader, diskann::Metric m)
     : reader(fileReader), metric(m), _thread_data(nullptr)
@@ -70,7 +225,6 @@ template <typename T, typename LabelT> PQFlashIndex<T, LabelT>::~PQFlashIndex()
     if (_nhood_cache_buf != nullptr)
     {
         delete[] _nhood_cache_buf;
-        diskann::aligned_free(_coord_cache_buf);
     }
 
     if (_load_flag)
@@ -210,19 +364,21 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     size_t num_cached_nodes = node_list.size();
 
     // Allocate space for neighborhood cache
-    // neighborhood cache 的大小取决于要缓存的节点数和每个节点的最大度数（即邻居数量）。对于每个要缓存的节点，我们需要为其邻居列表分配空间，邻居列表的长度由 _max_degree 决定。加1是为了存储邻居数量本身。
-    _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
+    // neighborhood cache 的大小取决于要缓存的节点数和每个节点的最大度数（即邻居数量）。对于每个要缓存的节点，我们需要为其邻居列表分配空间，邻居列表的长度由 _max_degree 决定。加1是为了存储邻居数量本身�?    _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
     memset(_nhood_cache_buf, 0, num_cached_nodes * (_max_degree + 1));
 
     // Allocate space for coordinate cache
-    // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时。
-    size_t coord_cache_buf_len = num_cached_nodes * _aligned_dim;
-    diskann::alloc_aligned((void **)&_coord_cache_buf, coord_cache_buf_len * sizeof(T), 8 * sizeof(T));
-    memset(_coord_cache_buf, 0, coord_cache_buf_len * sizeof(T));
+    // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时�?    size_t BLOCK_SIZE = 8;
+    // Allocate temporary space for coordinate cache reading
+    T* temp_coord_cache_buf;
+    size_t bytes_per_node = std::max((size_t)(_aligned_dim * sizeof(T)), (size_t)_disk_bytes_per_point);
+    size_t temp_coord_cache_buf_len = BLOCK_SIZE * (bytes_per_node / sizeof(T) + 1);
+    diskann::alloc_aligned((void **)&temp_coord_cache_buf, temp_coord_cache_buf_len * sizeof(T), 8 * sizeof(T));
+    memset(temp_coord_cache_buf, 0, temp_coord_cache_buf_len * sizeof(T));
+    
+    _compressed_coord_cache.clear();
 
-    size_t BLOCK_SIZE = 8;
-    // block 数量是要缓存的节点数除以每个 block 的大小（即 BLOCK_SIZE）。每个 block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一个 block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍。
-    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
+    // block 数量是要缓存的节点数除以每个 block 的大小（�?BLOCK_SIZE）。每�?block 包含 BLOCK_SIZE 个节点，这样可以批量处理节点的读取和缓存操作，提高效率。最后一�?block 可能包含少于 BLOCK_SIZE 个节点，如果总节点数不是 BLOCK_SIZE 的整数倍�?    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
     for (size_t block = 0; block < num_blocks; block++)
     {
         size_t start_idx = block * BLOCK_SIZE;
@@ -235,7 +391,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         for (size_t node_idx = start_idx; node_idx < end_idx; node_idx++)
         {
             nodes_to_read.push_back(node_list[node_idx]);
-            coord_buffers.push_back(_coord_cache_buf + node_idx * _aligned_dim);
+            size_t node_offset_in_buf = (node_idx - start_idx) * (bytes_per_node / sizeof(T) + 1);
+            coord_buffers.push_back(temp_coord_cache_buf + node_offset_in_buf);
             nbr_buffers.emplace_back(0, _nhood_cache_buf + node_idx * (_max_degree + 1));
         }
 
@@ -247,11 +404,23 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         {
             if (read_status[i] == true)
             {
-                _coord_cache.insert(std::make_pair(nodes_to_read[i], coord_buffers[i]));
+                std::vector<uint8_t> compressed_data;
+                if (!_use_disk_index_pq) {
+                    flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, compressed_data);
+                } else {
+                    // if already using PQ, coord_buffers[i] holds _disk_bytes_per_point of uint8_t data.
+                    // we'll just copy it directly.
+                    uint8_t* byte_ptr = (uint8_t*)coord_buffers[i];
+                    compressed_data.assign(byte_ptr, byte_ptr + _disk_bytes_per_point);
+                }
+                size_t current_offset = _compressed_coord_cache.size();
+                _compressed_coord_cache.insert(_compressed_coord_cache.end(), compressed_data.begin(), compressed_data.end());
+                _coord_cache.insert(std::make_pair(nodes_to_read[i], current_offset));
                 _nhood_cache.insert(std::make_pair(nodes_to_read[i], nbr_buffers[i]));
             }
         }
     }
+    diskann::aligned_free(temp_coord_cache_buf);
     diskann::cout << "..done." << std::endl;
 }
 
@@ -1489,14 +1658,19 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         for (auto &cached_nhood : cached_nhoods)
         {
             auto global_cache_iter = _coord_cache.find(cached_nhood.first);
-            T *node_fp_coords_copy = global_cache_iter->second;
+            size_t node_offset = global_cache_iter->second;
+            T *node_fp_coords_copy;
             float cur_expanded_dist;
             if (!_use_disk_index_pq)
             {
+                node_fp_coords_copy = data_buf;
+                size_t read_offset = node_offset;
+                flash_decode_vector<T>(_compressed_coord_cache.data(), read_offset, node_fp_coords_copy, this->_data_dim);
                 cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
             }
             else
             {
+                node_fp_coords_copy = (T*)(_compressed_coord_cache.data() + node_offset);
                 if (metric == diskann::Metric::INNER_PRODUCT)
                     cur_expanded_dist = _disk_pq_table.inner_product(query_float, (uint8_t *)node_fp_coords_copy);
                 else

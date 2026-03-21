@@ -209,9 +209,9 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     unsigned *_nhood_cache_buf = nullptr;
     tsl::robin_map<uint32_t, std::pair<uint32_t, uint32_t *>> _nhood_cache;
 
-    // coord_cache; The T* in coord_cache are offsets into coord_cache_buf
-    T *_coord_cache_buf = nullptr;
-    tsl::robin_map<uint32_t, T *> _coord_cache;
+    // coord_cache; We now store compressed coordinates in a flat contiguous byte buffer
+    std::vector<uint8_t> _compressed_coord_cache;
+    tsl::robin_map<uint32_t, size_t> _coord_cache; // maps node id to byte offset
 
     // thread-specific scratch
     ConcurrentQueue<SSDThreadData<T> *> _thread_data;
