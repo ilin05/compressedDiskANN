@@ -365,6 +365,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
 
     // Allocate space for neighborhood cache
     // neighborhood cache 的大小取决于要缓存的节点数和每个节点的最大度数（即邻居数量）。对于每个要缓存的节点，我们需要为其邻居列表分配空间，邻居列表的长度由 _max_degree 决定。加1是为了存储邻居数量本身�?    _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
+    _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
     memset(_nhood_cache_buf, 0, num_cached_nodes * (_max_degree + 1));
 
     // Allocate space for coordinate cache
