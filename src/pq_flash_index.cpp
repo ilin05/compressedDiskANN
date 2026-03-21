@@ -1667,7 +1667,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             {
                 node_fp_coords_copy = data_buf;
                 size_t read_offset = node_offset;
-                flash_decode_vector<T>(_compressed_coord_cache.data(), read_offset, node_fp_coords_copy, this->_data_dim);
+                flash_decode_vector<T>(_compressed_coord_cache.data() + read_offset, this->_data_dim, this->_aligned_dim, node_fp_coords_copy);
                 cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
             }
             else
