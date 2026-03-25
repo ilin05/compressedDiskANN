@@ -50,9 +50,9 @@ class AbstractIndex
     virtual void save(const char *filename, bool compact_before_save = false) = 0;
 
 #ifdef EXEC_ENV_OLS
-    virtual void load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l) = 0;
+    virtual void load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l, const char *pq_prefix = nullptr) = 0;
 #else
-    virtual void load(const char *index_file, uint32_t num_threads, uint32_t search_l) = 0;
+    virtual void load(const char *index_file, uint32_t num_threads, uint32_t search_l, const char *pq_prefix = nullptr) = 0;
 #endif
 
     // For FastL2 search on optimized layout

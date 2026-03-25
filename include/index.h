@@ -75,12 +75,12 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
 
     // Load functions
 #ifdef EXEC_ENV_OLS
-    DISKANN_DLLEXPORT void load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l);
+    DISKANN_DLLEXPORT void load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l, const char *pq_prefix = nullptr) override;
 #else
     // Reads the number of frozen points from graph's metadata file section.
     DISKANN_DLLEXPORT static size_t get_graph_num_frozen_points(const std::string &graph_file);
 
-    DISKANN_DLLEXPORT void load(const char *index_file, uint32_t num_threads, uint32_t search_l);
+    DISKANN_DLLEXPORT void load(const char *index_file, uint32_t num_threads, uint32_t search_l, const char *pq_prefix = nullptr) override;
 #endif
 
     // get some private variables

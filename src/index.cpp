@@ -529,10 +529,10 @@ size_t Index<T, TagT, LabelT>::load_delete_set(const std::string &filename)
 // node loc), and _final_graph (adjacency list)
 template <typename T, typename TagT, typename LabelT>
 #ifdef EXEC_ENV_OLS
-void Index<T, TagT, LabelT>::load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l)
+void Index<T, TagT, LabelT>::load(AlignedFileReader &reader, uint32_t num_threads, uint32_t search_l, const char *pq_prefix)
 {
 #else
-void Index<T, TagT, LabelT>::load(const char *filename, uint32_t num_threads, uint32_t search_l)
+void Index<T, TagT, LabelT>::load(const char *filename, uint32_t num_threads, uint32_t search_l, const char *pq_prefix)
 {
 #endif
     std::unique_lock<std::shared_timed_mutex> ul(_update_lock);
@@ -566,6 +566,15 @@ void Index<T, TagT, LabelT>::load(const char *filename, uint32_t num_threads, ui
         if (_enable_tags)
         {
             tags_file_num_pts = load_tags(tags_file);
+        }
+        if (_pq_dist)
+        {
+            if (pq_prefix == nullptr) {
+                diskann::cout << "Warning: _pq_dist is enabled but pq_prefix is null. Trying to use filename as prefix for loading PQ files." << std::endl;
+                _pq_data_store->load(filename);
+            } else {
+                _pq_data_store->load(pq_prefix);
+            }
         }
         graph_num_pts = load_graph(graph_file, data_file_num_pts);
 #endif

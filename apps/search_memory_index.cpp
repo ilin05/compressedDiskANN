@@ -30,7 +30,8 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                         const std::string &query_file, const std::string &truthset_file, const uint32_t num_threads,
                         const uint32_t recall_at, const bool print_all_recalls, const std::vector<uint32_t> &Lvec,
                         const bool dynamic, const bool tags, const bool show_qps_per_thread,
-                        const std::vector<std::string> &query_filters, const float fail_if_recall_below)
+                        const std::vector<std::string> &query_filters, const float fail_if_recall_below,
+                        const bool use_pq_dist, const uint32_t pq_bytes, const std::string &pq_prefix)
 {
     using TagT = uint32_t;
     // Load the query file
@@ -82,15 +83,15 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                       .is_dynamic_index(dynamic)
                       .is_enable_tags(tags)
                       .is_concurrent_consolidate(false)
-                      .is_pq_dist_build(false)
+                      .is_pq_dist_build(use_pq_dist)
                       .is_use_opq(false)
-                      .with_num_pq_chunks(0)
+                      .with_num_pq_chunks(pq_bytes)
                       .with_num_frozen_pts(num_frozen_pts)
                       .build();
 
     auto index_factory = diskann::IndexFactory(config);
     auto index = index_factory.create_instance();
-    index->load(index_path.c_str(), num_threads, *(std::max_element(Lvec.begin(), Lvec.end())));
+    index->load(index_path.c_str(), num_threads, *(std::max_element(Lvec.begin(), Lvec.end())), pq_prefix.empty() ? nullptr : pq_prefix.c_str());
     std::cout << "Index loaded" << std::endl;
 
     if (metric == diskann::FAST_L2)
@@ -278,11 +279,12 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
 int main(int argc, char **argv)
 {
     std::string data_type, dist_fn, index_path_prefix, result_path, query_file, gt_file, filter_label, label_type,
-        query_filters_file;
+        query_filters_file, pq_prefix;
     uint32_t num_threads, K;
     std::vector<uint32_t> Lvec;
-    bool print_all_recalls, dynamic, tags, show_qps_per_thread;
+    bool print_all_recalls, dynamic, tags, show_qps_per_thread, use_pq_dist;
     float fail_if_recall_below = 0.0f;
+    uint32_t pq_bytes = 0;
 
     po::options_description desc{
         program_options_utils::make_program_description("search_memory_index", "Searches in-memory DiskANN indexes")};
@@ -331,6 +333,15 @@ int main(int argc, char **argv)
         optional_configs.add_options()("fail_if_recall_below",
                                        po::value<float>(&fail_if_recall_below)->default_value(0.0f),
                                        program_options_utils::FAIL_IF_RECALL_BELOW);
+        optional_configs.add_options()("use_pq_dist",
+                                       po::value<bool>(&use_pq_dist)->default_value(false),
+                                       "Whether to use PQ distance for search");
+        optional_configs.add_options()("pq_bytes",
+                                       po::value<uint32_t>(&pq_bytes)->default_value(0),
+                                       "Number of PQ bytes. Needed if use_pq_dist is true.");
+        optional_configs.add_options()("pq_prefix",
+                                       po::value<std::string>(&pq_prefix)->default_value(""),
+                                       "Prefix of the PQ files, usually original input data file path.");
 
         // Output controls
         po::options_description output_controls("Output controls");
@@ -421,19 +432,22 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below,
+                    use_pq_dist, pq_bytes, pq_prefix);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below,
+                    use_pq_dist, pq_bytes, pq_prefix);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float, uint16_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                             num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                            show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                            show_qps_per_thread, query_filters, fail_if_recall_below,
+                                                            use_pq_dist, pq_bytes, pq_prefix);
             }
             else
             {
@@ -447,19 +461,22 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                    num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                   show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                   show_qps_per_thread, query_filters, fail_if_recall_below,
+                                                   use_pq_dist, pq_bytes, pq_prefix);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                     num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                    show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                    show_qps_per_thread, query_filters, fail_if_recall_below,
+                                                    use_pq_dist, pq_bytes, pq_prefix);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                   num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                  show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                  show_qps_per_thread, query_filters, fail_if_recall_below,
+                                                  use_pq_dist, pq_bytes, pq_prefix);
             }
             else
             {
