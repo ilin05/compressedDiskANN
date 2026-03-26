@@ -997,6 +997,26 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
         }
     }
 
+    // if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
+    // {
+    //     std::vector<Neighbor> rerank_candidates;
+        
+    //     uint32_t rerank_count = std::max((uint32_t)1, (uint32_t)(best_L_nodes.capacity() * _pq_exact_rerank_ratio));
+    //     rerank_count = std::min(rerank_count, (uint32_t)best_L_nodes.size());
+
+    //     for (uint32_t i = 0; i < rerank_count; ++i)
+    //     {
+    //         rerank_candidates.push_back(best_L_nodes[i]);
+    //     }
+        
+    //     best_L_nodes.clear();
+    //     for (auto& cand : rerank_candidates)
+    //     {
+    //         float exact_dist = _data_store->get_distance(aligned_query, cand.id);
+    //         best_L_nodes.insert(Neighbor(cand.id, exact_dist));
+    //     }
+    // }
+
     if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
     {
         std::vector<Neighbor> rerank_candidates;
@@ -1004,16 +1024,25 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
         uint32_t rerank_count = std::max((uint32_t)1, (uint32_t)(best_L_nodes.capacity() * _pq_exact_rerank_ratio));
         rerank_count = std::min(rerank_count, (uint32_t)best_L_nodes.size());
 
-        for (uint32_t i = 0; i < rerank_count; ++i)
+        // 1. 保存所有元素，而不仅仅是前 rerank_count 个
+        for (uint32_t i = 0; i < best_L_nodes.size(); ++i)
         {
             rerank_candidates.push_back(best_L_nodes[i]);
         }
         
         best_L_nodes.clear();
-        for (auto& cand : rerank_candidates)
+        
+        // 2. 将所有元素重新插回 priority queue
+        for (uint32_t i = 0; i < rerank_candidates.size(); ++i)
         {
-            float exact_dist = _data_store->get_distance(aligned_query, cand.id);
-            best_L_nodes.insert(Neighbor(cand.id, exact_dist));
+            if (i < rerank_count) {
+                // 如果在 rerank 范围内，则按确切距离重排
+                float exact_dist = _data_store->get_distance(aligned_query, rerank_candidates[i].id);
+                best_L_nodes.insert(Neighbor(rerank_candidates[i].id, exact_dist));
+            } else {
+                // 如果不在 rerank 范围内，沿用原有的粗略（PQ）距离
+                best_L_nodes.insert(rerank_candidates[i]);
+            }
         }
     }
 
