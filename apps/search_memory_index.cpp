@@ -31,7 +31,7 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                         const uint32_t recall_at, const bool print_all_recalls, const std::vector<uint32_t> &Lvec,
                         const bool dynamic, const bool tags, const bool show_qps_per_thread,
                         const std::vector<std::string> &query_filters, const float fail_if_recall_below,
-                        const bool use_pq_dist, const uint32_t pq_bytes, const std::string &pq_prefix)
+                        const bool use_pq_dist, const uint32_t pq_bytes, const std::string &pq_prefix, const float pq_exact_rerank_ratio)
 {
     using TagT = uint32_t;
     // Load the query file
@@ -92,6 +92,7 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
     auto index_factory = diskann::IndexFactory(config);
     auto index = index_factory.create_instance();
     index->load(index_path.c_str(), num_threads, *(std::max_element(Lvec.begin(), Lvec.end())), pq_prefix.empty() ? nullptr : pq_prefix.c_str());
+    index->set_pq_exact_rerank_ratio(pq_exact_rerank_ratio);
     std::cout << "Index loaded" << std::endl;
 
     if (metric == diskann::FAST_L2)
@@ -284,6 +285,7 @@ int main(int argc, char **argv)
     std::vector<uint32_t> Lvec;
     bool print_all_recalls, dynamic, tags, show_qps_per_thread, use_pq_dist;
     float fail_if_recall_below = 0.0f;
+    float pq_exact_rerank_ratio = 0.0f;
     uint32_t pq_bytes = 0;
 
     po::options_description desc{
@@ -336,6 +338,9 @@ int main(int argc, char **argv)
         optional_configs.add_options()("use_pq_dist",
                                        po::value<bool>(&use_pq_dist)->default_value(false),
                                        "Whether to use PQ distance for search");
+        optional_configs.add_options()("pq_exact_rerank_ratio",
+                                       po::value<float>(&pq_exact_rerank_ratio)->default_value(0.0f),
+                                       "Ratio of L to do exact rerank when use_pq_dist is true.");
         optional_configs.add_options()("pq_bytes",
                                        po::value<uint32_t>(&pq_bytes)->default_value(0),
                                        "Number of PQ bytes. Needed if use_pq_dist is true.");
@@ -433,21 +438,21 @@ int main(int argc, char **argv)
                 return search_memory_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
                     Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below,
-                    use_pq_dist, pq_bytes, pq_prefix);
+                    use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
                     Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below,
-                    use_pq_dist, pq_bytes, pq_prefix);
+                    use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float, uint16_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                             num_threads, K, print_all_recalls, Lvec, dynamic, tags,
                                                             show_qps_per_thread, query_filters, fail_if_recall_below,
-                                                            use_pq_dist, pq_bytes, pq_prefix);
+                                                            use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else
             {
@@ -462,21 +467,21 @@ int main(int argc, char **argv)
                 return search_memory_index<int8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                    num_threads, K, print_all_recalls, Lvec, dynamic, tags,
                                                    show_qps_per_thread, query_filters, fail_if_recall_below,
-                                                   use_pq_dist, pq_bytes, pq_prefix);
+                                                   use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                     num_threads, K, print_all_recalls, Lvec, dynamic, tags,
                                                     show_qps_per_thread, query_filters, fail_if_recall_below,
-                                                    use_pq_dist, pq_bytes, pq_prefix);
+                                                    use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                   num_threads, K, print_all_recalls, Lvec, dynamic, tags,
                                                   show_qps_per_thread, query_filters, fail_if_recall_below,
-                                                  use_pq_dist, pq_bytes, pq_prefix);
+                                                  use_pq_dist, pq_bytes, pq_prefix, pq_exact_rerank_ratio);
             }
             else
             {

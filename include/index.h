@@ -86,6 +86,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     // get some private variables
     DISKANN_DLLEXPORT size_t get_num_points();
     DISKANN_DLLEXPORT size_t get_max_points();
+    DISKANN_DLLEXPORT void set_pq_exact_rerank_ratio(float ratio);
 
     DISKANN_DLLEXPORT bool detect_common_filters(uint32_t point_id, bool search_invocation,
                                                  const std::vector<LabelT> &incoming_labels);
@@ -402,6 +403,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     // Flags for PQ based distance calculation
     bool _pq_dist = false;
     bool _use_opq = false;
+    float _pq_exact_rerank_ratio = 0.0f;
     size_t _num_pq_chunks = 0;
     // REFACTOR
     // uint8_t *_pq_data = nullptr;

@@ -996,6 +996,27 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
             best_L_nodes.insert(Neighbor(id_scratch[m], dist_scratch[m]));
         }
     }
+
+    if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
+    {
+        std::vector<Neighbor> rerank_candidates;
+        
+        uint32_t rerank_count = std::max((uint32_t)1, (uint32_t)(best_L_nodes.capacity() * _pq_exact_rerank_ratio));
+        rerank_count = std::min(rerank_count, (uint32_t)best_L_nodes.size());
+
+        for (uint32_t i = 0; i < rerank_count; ++i)
+        {
+            rerank_candidates.push_back(best_L_nodes[i]);
+        }
+        
+        best_L_nodes.clear();
+        for (auto& cand : rerank_candidates)
+        {
+            float exact_dist = _data_store->get_distance(aligned_query, cand.id);
+            best_L_nodes.insert(Neighbor(cand.id, exact_dist));
+        }
+    }
+
     return std::make_pair(hops, cmps);
 }
 
@@ -2253,6 +2274,11 @@ template <typename T, typename TagT, typename LabelT> size_t Index<T, TagT, Labe
 {
     std::shared_lock<std::shared_timed_mutex> tl(_tag_lock);
     return _max_points;
+}
+
+template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::set_pq_exact_rerank_ratio(float ratio)
+{
+    _pq_exact_rerank_ratio = ratio;
 }
 
 template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::generate_frozen_point()
