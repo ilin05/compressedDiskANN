@@ -100,6 +100,8 @@ class AbstractIndex
     virtual consolidation_report consolidate_deletes(const IndexWriteParameters &parameters) = 0;
 
     virtual void optimize_index_layout() = 0;
+    
+    virtual void set_pq_exact_rerank_ratio(float ratio) {}
 
     // memory should be allocated for vec before calling this function
     template <typename tag_type, typename data_type> int get_vector_by_tag(tag_type &tag, data_type *vec);
