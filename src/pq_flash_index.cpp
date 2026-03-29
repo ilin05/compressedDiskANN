@@ -414,10 +414,15 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                     // if already using PQ, coord_buffers[i] holds _disk_bytes_per_point of uint8_t data.
                     // we'll just copy it directly.
                     uint8_t* byte_ptr = (uint8_t*)coord_buffers[i];
-                    compressed_data.assign(byte_ptr, byte_ptr + _disk_bytes_per_point);
+                    if (_disk_bytes_per_point > 0 && byte_ptr != nullptr) {
+                        compressed_data.resize(_disk_bytes_per_point);
+                        std::memcpy(compressed_data.data(), byte_ptr, _disk_bytes_per_point);
+                    }
                 }
                 size_t current_offset = _compressed_coord_cache.size();
-                _compressed_coord_cache.insert(_compressed_coord_cache.end(), compressed_data.begin(), compressed_data.end());
+                if (!compressed_data.empty()) {
+                    _compressed_coord_cache.insert(_compressed_coord_cache.end(), compressed_data.begin(), compressed_data.end());
+                }
                 _coord_cache.insert(std::make_pair(nodes_to_read[i], current_offset));
                 _nhood_cache.insert(std::make_pair(nodes_to_read[i], nbr_buffers[i]));
             }
