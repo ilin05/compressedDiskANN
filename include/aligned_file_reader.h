@@ -67,6 +67,7 @@ struct IOContext
 #include <cstdio>
 #include <mutex>
 #include <thread>
+#include <stdexcept>
 #include "tsl/robin_map.h"
 #include "utils.h"
 
@@ -117,6 +118,14 @@ class AlignedFileReader
     // process batch of aligned requests in parallel
     // NOTE :: blocking call
     virtual void read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async = false) = 0;
+
+    // async interface
+    virtual void submit_req(IOContext &ctx, std::vector<AlignedRead*> &read_reqs) {
+        throw std::runtime_error("submit_req not implemented");
+    }
+    virtual int get_events(IOContext &ctx, int min_nr, int max_nr, std::vector<AlignedRead*> &completed_reqs) {
+        throw std::runtime_error("get_events not implemented");
+    }
 
 #ifdef USE_BING_INFRA
     // wait for completion of one request in a batch of requests

@@ -226,3 +226,45 @@ void LinuxAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, io_contex
     assert(this->file_desc != -1);
     execute_io(ctx, this->file_desc, read_reqs);
 }
+
+void LinuxAlignedFileReader::submit_req(io_context_t &ctx, std::vector<AlignedRead*> &read_reqs)
+{
+    uint64_t n_ops = read_reqs.size();
+    if (n_ops == 0) return;
+    std::vector<iocb_t *> cbs(n_ops, nullptr);
+
+    for (uint64_t j = 0; j < n_ops; j++)
+    {
+        struct iocb* cb = new struct iocb;
+        io_prep_pread(cb, this->file_desc, read_reqs[j]->buf, read_reqs[j]->len, read_reqs[j]->offset);
+        cb->data = read_reqs[j]; // Pass AlignedRead pointer to user data
+        cbs[j] = cb;
+    }
+
+    int64_t ret = io_submit(ctx, (int64_t)n_ops, cbs.data());
+    if (ret != (int64_t)n_ops)
+    {
+        std::cerr << "io_submit() failed; returned " << ret << ", expected=" << n_ops << ", ernno=" << errno
+                  << "=" << ::strerror(-ret) << "\n";
+        exit(-1);
+    }
+}
+
+int LinuxAlignedFileReader::get_events(io_context_t &ctx, int min_nr, int max_nr, std::vector<AlignedRead*> &completed_reqs)
+{
+    std::vector<io_event_t> evts(max_nr);
+    int64_t ret = io_getevents(ctx, (int64_t)min_nr, (int64_t)max_nr, evts.data(), nullptr);
+    if (ret < 0)
+    {
+        std::cerr << "io_getevents() failed; returned " << ret << ", ernno=" << errno << "=" << ::strerror(-ret) << "\n";
+        exit(-1);
+    }
+
+    for (int i = 0; i < ret; i++)
+    {
+        completed_reqs.push_back(static_cast<AlignedRead*>(evts[i].data));
+        struct iocb* cb = static_cast<struct iocb*>(evts[i].obj);
+        delete cb;
+    }
+    return ret;
+}

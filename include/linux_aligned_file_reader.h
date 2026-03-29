@@ -34,6 +34,10 @@ class LinuxAlignedFileReader : public AlignedFileReader
     // process batch of aligned requests in parallel
     // NOTE :: blocking call
     void read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async = false);
+
+    // async interface
+    void submit_req(IOContext &ctx, std::vector<AlignedRead*> &read_reqs) override;
+    int get_events(IOContext &ctx, int min_nr, int max_nr, std::vector<AlignedRead*> &completed_reqs) override;
 };
 
 #endif
