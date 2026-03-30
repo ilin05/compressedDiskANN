@@ -6,87 +6,55 @@
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+#include <cstring>
 #include "tsl/robin_map.h"
 #include "utils.h"
 #define MAX_EVENTS 1024
 
 namespace
 {
-typedef struct io_event io_event_t;
-typedef struct iocb iocb_t;
-
-void execute_io(io_context_t ctx, int fd, std::vector<AlignedRead> &read_reqs, uint64_t n_retries = 0)
+void execute_io(IOContext ctx, int fd, std::vector<AlignedRead> &read_reqs, uint64_t n_retries = 0)
 {
 #ifdef DEBUG
     for (auto &req : read_reqs)
     {
         assert(IS_ALIGNED(req.len, 512));
-        // std::cout << "request:"<<req.offset<<":"<<req.len << std::endl;
         assert(IS_ALIGNED(req.offset, 512));
         assert(IS_ALIGNED(req.buf, 512));
-        // assert(malloc_usable_size(req.buf) >= req.len);
     }
 #endif
 
-    // break-up requests into chunks of size MAX_EVENTS each
     uint64_t n_iters = ROUND_UP(read_reqs.size(), MAX_EVENTS) / MAX_EVENTS;
     for (uint64_t iter = 0; iter < n_iters; iter++)
     {
         uint64_t n_ops = std::min((uint64_t)read_reqs.size() - (iter * MAX_EVENTS), (uint64_t)MAX_EVENTS);
-        std::vector<iocb_t *> cbs(n_ops, nullptr);
-        std::vector<io_event_t> evts(n_ops);
-        std::vector<struct iocb> cb(n_ops);
         for (uint64_t j = 0; j < n_ops; j++)
         {
-            io_prep_pread(cb.data() + j, fd, read_reqs[j + iter * MAX_EVENTS].buf, read_reqs[j + iter * MAX_EVENTS].len,
-                          read_reqs[j + iter * MAX_EVENTS].offset);
+            struct io_uring_sqe *sqe = io_uring_get_sqe(ctx);
+            if (!sqe) {
+                io_uring_submit(ctx);
+                sqe = io_uring_get_sqe(ctx);
+            }
+            io_uring_prep_read(sqe, fd, read_reqs[j + iter * MAX_EVENTS].buf, read_reqs[j + iter * MAX_EVENTS].len, read_reqs[j + iter * MAX_EVENTS].offset);
+            io_uring_sqe_set_data(sqe, &read_reqs[j + iter * MAX_EVENTS]);
         }
 
-        // initialize `cbs` using `cb` array
-        //
+        io_uring_submit(ctx);
 
-        for (uint64_t i = 0; i < n_ops; i++)
+        for (uint64_t j = 0; j < n_ops; j++)
         {
-            cbs[i] = cb.data() + i;
-        }
-
-        uint64_t n_tries = 0;
-        while (n_tries <= n_retries)
-        {
-            // issue reads
-            int64_t ret = io_submit(ctx, (int64_t)n_ops, cbs.data());
-            // if requests didn't get accepted
-            if (ret != (int64_t)n_ops)
-            {
-                std::cerr << "io_submit() failed; returned " << ret << ", expected=" << n_ops << ", ernno=" << errno
-                          << "=" << ::strerror(-ret) << ", try #" << n_tries + 1;
-                std::cout << "ctx: " << ctx << "\n";
+            struct io_uring_cqe *cqe;
+            int ret = io_uring_wait_cqe(ctx, &cqe);
+            if (ret < 0) {
+                std::cerr << "io_uring_wait_cqe failed: " << strerror(-ret) << std::endl;
                 exit(-1);
             }
-            else
-            {
-                // wait on io_getevents
-                ret = io_getevents(ctx, (int64_t)n_ops, (int64_t)n_ops, evts.data(), nullptr);
-                // if requests didn't complete
-                if (ret != (int64_t)n_ops)
-                {
-                    std::cerr << "io_getevents() failed; returned " << ret << ", expected=" << n_ops
-                              << ", ernno=" << errno << "=" << ::strerror(-ret) << ", try #" << n_tries + 1;
-                    exit(-1);
-                }
-                else
-                {
-                    break;
-                }
+            if (cqe->res < 0) {
+                std::cerr << "io_uring read failed: " << strerror(-cqe->res) << std::endl;
+                exit(-1);
             }
+            io_uring_cqe_seen(ctx, cqe);
         }
-        // disabled since req.buf could be an offset into another buf
-        /*
-        for (auto &req : read_reqs) {
-          // corruption check
-          assert(malloc_usable_size(req.buf) >= req.len);
-        }
-        */
     }
 }
 } // namespace
@@ -99,32 +67,27 @@ LinuxAlignedFileReader::LinuxAlignedFileReader()
 LinuxAlignedFileReader::~LinuxAlignedFileReader()
 {
     int64_t ret;
-    // check to make sure file_desc is closed
     ret = ::fcntl(this->file_desc, F_GETFD);
     if (ret == -1)
     {
         if (errno != EBADF)
         {
             std::cerr << "close() not called" << std::endl;
-            // close file desc
             ret = ::close(this->file_desc);
-            // error checks
             if (ret == -1)
             {
-                std::cerr << "close() failed; returned " << ret << ", errno=" << errno << ":" << ::strerror(errno)
-                          << std::endl;
+                std::cerr << "close() failed; returned " << ret << ", errno=" << errno << ":" << ::strerror(errno) << std::endl;
             }
         }
     }
 }
 
-io_context_t &LinuxAlignedFileReader::get_ctx()
+IOContext &LinuxAlignedFileReader::get_ctx()
 {
     std::unique_lock<std::mutex> lk(ctx_mut);
-    // perform checks only in DEBUG mode
     if (ctx_map.find(std::this_thread::get_id()) == ctx_map.end())
     {
-        std::cerr << "bad thread access; returning -1 as io_context_t" << std::endl;
+        std::cerr << "bad thread access; returning nullptr as IOContext" << std::endl;
         return this->bad_ctx;
     }
     else
@@ -142,25 +105,29 @@ void LinuxAlignedFileReader::register_thread()
         std::cerr << "multiple calls to register_thread from the same thread" << std::endl;
         return;
     }
-    io_context_t ctx = 0;
-    int ret = io_setup(MAX_EVENTS, &ctx);
+    
+    struct io_uring* ring = new struct io_uring;
+    // Try to setup with SQPOLL for best performance
+    struct io_uring_params params;
+    memset(&params, 0, sizeof(params));
+    params.flags |= IORING_SETUP_SQPOLL;
+    params.sq_thread_idle = 2000;
+    
+    int ret = io_uring_queue_init_params(MAX_EVENTS, ring, &params);
     if (ret != 0)
     {
-        lk.unlock();
-        if (ret == -EAGAIN)
-        {
-            std::cerr << "io_setup() failed with EAGAIN: Consider increasing /proc/sys/fs/aio-max-nr" << std::endl;
-        }
-        else
-        {
-            std::cerr << "io_setup() failed; returned " << ret << ": " << ::strerror(-ret) << std::endl;
+        // Fallback to normal io_uring if SQPOLL is not supported
+        ret = io_uring_queue_init(MAX_EVENTS, ring, 0);
+        if (ret != 0) {
+            lk.unlock();
+            std::cerr << "io_uring_queue_init() failed; returned " << ret << ": " << ::strerror(-ret) << std::endl;
+            delete ring;
+            return;
         }
     }
-    else
-    {
-        diskann::cout << "allocating ctx: " << ctx << " to thread-id:" << my_id << std::endl;
-        ctx_map[my_id] = ctx;
-    }
+
+    diskann::cout << "allocating ctx: " << ring << " to thread-id:" << my_id << std::endl;
+    ctx_map[my_id] = ring;
     lk.unlock();
 }
 
@@ -170,11 +137,9 @@ void LinuxAlignedFileReader::deregister_thread()
     std::unique_lock<std::mutex> lk(ctx_mut);
     assert(ctx_map.find(my_id) != ctx_map.end());
 
-    lk.unlock();
-    io_context_t ctx = this->get_ctx();
-    io_destroy(ctx);
-    //  assert(ret == 0);
-    lk.lock();
+    IOContext ctx = ctx_map[my_id];
+    io_uring_queue_exit(ctx);
+    delete ctx;
     ctx_map.erase(my_id);
     std::cerr << "returned ctx from thread-id:" << my_id << std::endl;
     lk.unlock();
@@ -185,39 +150,28 @@ void LinuxAlignedFileReader::deregister_all_threads()
     std::unique_lock<std::mutex> lk(ctx_mut);
     for (auto x = ctx_map.begin(); x != ctx_map.end(); x++)
     {
-        io_context_t ctx = x.value();
-        io_destroy(ctx);
-        //  assert(ret == 0);
-        //  lk.lock();
-        //  ctx_map.erase(my_id);
-        //  std::cerr << "returned ctx from thread-id:" << my_id << std::endl;
+        IOContext ctx = x.value();
+        io_uring_queue_exit(ctx);
+        delete ctx;
     }
     ctx_map.clear();
-    //  lk.unlock();
 }
 
 void LinuxAlignedFileReader::open(const std::string &fname)
 {
     int flags = O_DIRECT | O_RDONLY | O_LARGEFILE;
     this->file_desc = ::open(fname.c_str(), flags);
-    // error checks
     assert(this->file_desc != -1);
     std::cerr << "Opened file : " << fname << std::endl;
 }
 
 void LinuxAlignedFileReader::close()
 {
-    //  int64_t ret;
-
-    // check to make sure file_desc is closed
     ::fcntl(this->file_desc, F_GETFD);
-    //  assert(ret != -1);
-
     ::close(this->file_desc);
-    //  assert(ret != -1);
 }
 
-void LinuxAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, io_context_t &ctx, bool async)
+void LinuxAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async)
 {
     if (async == true)
     {
@@ -227,44 +181,52 @@ void LinuxAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, io_contex
     execute_io(ctx, this->file_desc, read_reqs);
 }
 
-void LinuxAlignedFileReader::submit_req(io_context_t &ctx, std::vector<AlignedRead*> &read_reqs)
+void LinuxAlignedFileReader::submit_req(IOContext &ctx, std::vector<AlignedRead*> &read_reqs)
 {
     uint64_t n_ops = read_reqs.size();
     if (n_ops == 0) return;
-    std::vector<iocb_t *> cbs(n_ops, nullptr);
 
     for (uint64_t j = 0; j < n_ops; j++)
     {
-        struct iocb* cb = new struct iocb;
-        io_prep_pread(cb, this->file_desc, read_reqs[j]->buf, read_reqs[j]->len, read_reqs[j]->offset);
-        cb->data = read_reqs[j]; // Pass AlignedRead pointer to user data
-        cbs[j] = cb;
+        struct io_uring_sqe *sqe = io_uring_get_sqe(ctx);
+        if (!sqe) {
+            io_uring_submit(ctx);
+            sqe = io_uring_get_sqe(ctx);
+        }
+        io_uring_prep_read(sqe, this->file_desc, read_reqs[j]->buf, read_reqs[j]->len, read_reqs[j]->offset);
+        io_uring_sqe_set_data(sqe, read_reqs[j]);
     }
 
-    int64_t ret = io_submit(ctx, (int64_t)n_ops, cbs.data());
-    if (ret != (int64_t)n_ops)
-    {
-        std::cerr << "io_submit() failed; returned " << ret << ", expected=" << n_ops << ", ernno=" << errno
-                  << "=" << ::strerror(-ret) << "\n";
-        exit(-1);
-    }
+    io_uring_submit(ctx);
 }
 
-int LinuxAlignedFileReader::get_events(io_context_t &ctx, int min_nr, int max_nr, std::vector<AlignedRead*> &completed_reqs)
+int LinuxAlignedFileReader::get_events(IOContext &ctx, int min_nr, int max_nr, std::vector<AlignedRead*> &completed_reqs)
 {
-    std::vector<io_event_t> evts(max_nr);
-    int64_t ret = io_getevents(ctx, (int64_t)min_nr, (int64_t)max_nr, evts.data(), nullptr);
-    if (ret < 0)
-    {
-        std::cerr << "io_getevents() failed; returned " << ret << ", ernno=" << errno << "=" << ::strerror(-ret) << "\n";
-        exit(-1);
+    struct io_uring_cqe *cqe;
+    unsigned head;
+    int count = 0;
+
+    // We can do a peek first to quickly get completed events, or wait for min_nr
+    if (min_nr > 0) {
+        int ret = io_uring_wait_cqe_nr(ctx, &cqe, min_nr);
+        if (ret < 0) {
+            std::cerr << "io_uring_wait_cqe_nr() failed; returned " << ret << ", errno=" << ::strerror(-ret) << "\n";
+            exit(-1);
+        }
     }
 
-    for (int i = 0; i < ret; i++)
-    {
-        completed_reqs.push_back(static_cast<AlignedRead*>(evts[i].data));
-        struct iocb* cb = static_cast<struct iocb*>(evts[i].obj);
-        delete cb;
+    io_uring_for_each_cqe(ctx, head, cqe) {
+        if (count >= max_nr) break;
+        
+        if (cqe->res < 0) {
+            std::cerr << "io_uring read failed: " << strerror(-cqe->res) << std::endl;
+            exit(-1);
+        }
+        
+        completed_reqs.push_back(static_cast<AlignedRead*>(io_uring_cqe_get_data(cqe)));
+        count++;
     }
-    return ret;
+
+    io_uring_cq_advance(ctx, count);
+    return count;
 }

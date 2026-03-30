@@ -10,9 +10,9 @@
 
 #ifndef _WINDOWS
 #include <fcntl.h>
-#include <libaio.h>
+#include <liburing.h>
 #include <unistd.h>
-typedef io_context_t IOContext;
+typedef struct io_uring* IOContext;
 #else
 #include <Windows.h>
 #include <minwinbase.h>
