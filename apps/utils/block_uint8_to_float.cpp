@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     writer.write((char *)&npts_i32, sizeof(int));
     writer.write((char *)&dim_i32, sizeof(int));
 
-    size_t block_size = 1000000;
+    size_t block_size = 50000000;
     uint8_t *input_buf = new uint8_t[block_size * nd];
     float *output_buf = new float[block_size * nd];
 
