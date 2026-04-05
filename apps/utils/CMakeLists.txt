@@ -36,6 +36,9 @@ target_link_libraries(int8_to_float_scale ${PROJECT_NAME})
 add_executable(uint8_to_float uint8_to_float.cpp)
 target_link_libraries(uint8_to_float ${PROJECT_NAME})
 
+add_executable(block_uint8_to_float block_uint8_to_float.cpp)
+target_link_libraries(block_uint8_to_float ${PROJECT_NAME})
+
 add_executable(uint32_to_uint8 uint32_to_uint8.cpp)
 target_link_libraries(uint32_to_uint8 ${PROJECT_NAME})
 
@@ -95,6 +98,7 @@ if (NOT MSVC)
             int8_to_float
             int8_to_float_scale
             uint8_to_float
+            block_uint8_to_float
             uint32_to_uint8
             vector_analysis
             gen_random_slice
