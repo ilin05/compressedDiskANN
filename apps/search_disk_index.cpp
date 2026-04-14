@@ -61,11 +61,11 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         uint32_t L;
         uint32_t beamwidth;
         double qps;
-        float mean_latency;
-        float latency_999;
-        float mean_ios;
-        float mean_io_us;
-        float mean_cpu_us;
+        double mean_latency;
+        double latency_999;
+        double mean_ios;
+        double mean_io_us;
+        double mean_cpu_us;
         double recall;
         bool has_recall;
     };
@@ -310,7 +310,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
             diskann::cout << std::endl;
 
         csv_rows.push_back(SearchCsvRow{L, optimized_beamwidth, qps, mean_latency, latency_999,
-                                        static_cast<float>(mean_ios), mean_io_us, mean_cpuus, recall,
+                                        mean_ios, mean_io_us, mean_cpuus, recall,
                                         calc_recall_flag});
         delete[] stats;
     }
