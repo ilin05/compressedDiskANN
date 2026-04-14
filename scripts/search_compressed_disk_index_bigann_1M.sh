@@ -1,1 +1,16 @@
-../build/apps/search_disk_index  --data_type float --dist_fn l2 --index_path_prefix data/bigann/disk_index_bigann_1M_R32_L50_A1.2 --query_file data/bigann/bigann_query.fbin --gt_file data/bigann/bigann_1M_gt.bin -K 1 -L 2 4 6 8 10 -T 1 --result_path data/bigann/res --num_nodes_to_cache 100000
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR="$(cd "$SCRIPT_DIR/../build" && pwd)"
+DATA_DIR="$BUILD_DIR/data/bigann"
+
+"$BUILD_DIR/apps/search_disk_index" \
+  --data_type float \
+  --dist_fn l2 \
+  --index_path_prefix "$DATA_DIR/disk_index_bigann_1M_R32_L50_A1.2" \
+  --query_file "$DATA_DIR/bigann_query.fbin" \
+  --gt_file "$DATA_DIR/bigann_1M_gt.bin" \
+  -K 1 -L 2 4 6 8 10 -T 1 \
+  --result_path "$DATA_DIR/res" \
+  --num_nodes_to_cache 100000
