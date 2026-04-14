@@ -3,6 +3,7 @@
 
 #include "common_includes.h"
 #include <boost/program_options.hpp>
+#include <fstream>
 
 #include "index.h"
 #include "disk_utils.h"
@@ -55,6 +56,20 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const std::vector<uint32_t> &Lvec, const float fail_if_recall_below,
                       const std::vector<std::string> &query_filters, const bool use_reorder_data = false)
 {
+    struct SearchCsvRow
+    {
+        uint32_t L;
+        uint32_t beamwidth;
+        double qps;
+        double mean_latency;
+        double latency_999;
+        double mean_ios;
+        double mean_io_us;
+        double mean_cpu_us;
+        double recall;
+        bool has_recall;
+    };
+
     diskann::cout << "Search parameters: #threads: " << num_threads << ", ";
     if (beamwidth <= 0)
         diskann::cout << "beamwidth to be optimized for each L value" << std::flush;
@@ -198,6 +213,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     uint32_t optimized_beamwidth = 2;
 
     double best_recall = 0.0;
+    std::vector<SearchCsvRow> csv_rows;
 
     for (uint32_t test_id = 0; test_id < Lvec.size(); test_id++)
     {
@@ -292,7 +308,35 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         }
         else
             diskann::cout << std::endl;
+
+        csv_rows.push_back(SearchCsvRow{L, optimized_beamwidth, qps, mean_latency, latency_999,
+                                        mean_ios, mean_io_us, mean_cpuus, recall, calc_recall_flag});
         delete[] stats;
+    }
+
+    const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
+                                        std::to_string(num_threads) + "_search_result.csv";
+    std::ofstream csv_out(csv_result_path);
+    if (csv_out.is_open())
+    {
+        csv_out << "L,Beamwidth,QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@"
+                << recall_at << "\n";
+        csv_out.setf(std::ios::fixed, std::ios::floatfield);
+        csv_out.precision(6);
+        for (const auto &row : csv_rows)
+        {
+            csv_out << row.L << ',' << row.beamwidth << ',' << row.qps << ',' << row.mean_latency << ','
+                    << row.latency_999 << ',' << row.mean_ios << ',' << row.mean_io_us << ',' << row.mean_cpu_us
+                    << ',';
+            if (row.has_recall)
+                csv_out << row.recall;
+            csv_out << "\n";
+        }
+        diskann::cout << "Saved search summary CSV to " << csv_result_path << std::endl;
+    }
+    else
+    {
+        diskann::cout << "Warning: failed to open CSV output file " << csv_result_path << std::endl;
     }
 
     diskann::cout << "Done searching. Now saving results " << std::endl;

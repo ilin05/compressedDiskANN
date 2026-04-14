@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <numeric>
+#include <fstream>
 #include <omp.h>
 #include <set>
 #include <string.h>
@@ -33,6 +34,17 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                         const std::vector<std::string> &query_filters, const float fail_if_recall_below)
 {
     using TagT = uint32_t;
+    struct SearchCsvRow
+    {
+        uint32_t L;
+        double qps;
+        double avg_cmps;
+        double mean_latency;
+        double latency_999;
+        double recall;
+        bool has_recall;
+    };
+
     // Load the query file
     T *query = nullptr;
     uint32_t *gt_ids = nullptr;
@@ -143,6 +155,7 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
     }
 
     double best_recall = 0.0;
+    std::vector<SearchCsvRow> csv_rows;
 
     for (uint32_t test_id = 0; test_id < Lvec.size(); test_id++)
     {
@@ -249,6 +262,34 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
             best_recall = std::max(recall, best_recall);
         }
         std::cout << std::endl;
+
+        const double recall_for_csv = recalls.empty() ? 0.0 : recalls.back();
+        csv_rows.push_back(SearchCsvRow{L, displayed_qps, avg_cmps, mean_latency,
+                                        latency_stats[(uint64_t)(0.999 * query_num)], recall_for_csv,
+                                        calc_recall_flag});
+    }
+
+    const std::string csv_result_path = index_path + "_K" + std::to_string(recall_at) + "_T" +
+                                        std::to_string(num_threads) + "_search_result.csv";
+    std::ofstream csv_out(csv_result_path);
+    if (csv_out.is_open())
+    {
+        csv_out << "Ls,QPS,Avg dist cmps,Mean Latency (mus),99.9 Latency,Recall@" << recall_at << "\n";
+        csv_out.setf(std::ios::fixed, std::ios::floatfield);
+        csv_out.precision(6);
+        for (const auto &row : csv_rows)
+        {
+            csv_out << row.L << ',' << row.qps << ',' << row.avg_cmps << ',' << row.mean_latency << ','
+                    << row.latency_999 << ',';
+            if (row.has_recall)
+                csv_out << row.recall;
+            csv_out << "\n";
+        }
+        std::cout << "Saved search summary CSV to " << csv_result_path << std::endl;
+    }
+    else
+    {
+        std::cout << "Warning: failed to open CSV output file " << csv_result_path << std::endl;
     }
 
     std::cout << "Done searching. Now saving results " << std::endl;
