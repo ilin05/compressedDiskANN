@@ -14,6 +14,6 @@ DATA_DIR="$BUILD_DIR/data/bigann"
   -K 1 -L 2 4 6 8 10 -T 1 \
   --result_path "$DATA_DIR/res" \
   --use_pq_dist 1 \
-  --pq_bytes 16 \
+  --pq_bytes 32 \
   --pq_prefix "$DATA_DIR/bigann_100M.fbin" \
   --pq_exact_rerank_ratio 0.2
