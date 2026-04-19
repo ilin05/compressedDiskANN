@@ -13,4 +13,4 @@ DATA_DIR="$BUILD_DIR/data/bigann"
   --gt_file "$DATA_DIR/bigann_1B_gt.bin" \
   -K 1 -L 2 4 6 8 10 -T 1 \
   --result_path "$DATA_DIR/res" \
-  --num_nodes_to_cache 100000000
+  --num_nodes_to_cache 400000000
