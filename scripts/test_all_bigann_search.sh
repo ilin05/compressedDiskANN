@@ -11,9 +11,9 @@ echo "==================================="
 bash "$SCRIPT_DIR/search_memory_index_bigann_100M.sh"
 
 echo "==================================="
-echo "2. Running Search Tests for Disk Index on BigANN 500M"
+echo "2. Running Search Tests for Disk Index on BigANN 200M"
 echo "==================================="
-bash "$SCRIPT_DIR/search_disk_index_bigann_500M.sh"
+bash "$SCRIPT_DIR/search_disk_index_bigann_200M.sh"
 
 echo "==================================="
 echo "3. Running Search Tests for Disk Index on BigANN 1B"
