@@ -11,6 +11,16 @@ DATA_DIR="$BUILD_DIR/data/bigann"
   --index_path_prefix "$DATA_DIR/disk_index_bigann_1B_R32_L50_A1.2" \
   --query_file "$DATA_DIR/bigann_query.fbin" \
   --gt_file "$DATA_DIR/bigann_1B_gt.bin" \
-  -K 1 -L 2 4 6 8 10 -T 1 \
+  -K 1 -L 1 2 3 4 5 6 8 10 -T 1 \
+  --result_path "$DATA_DIR/res" \
+  --num_nodes_to_cache 400000000
+
+"$BUILD_DIR/apps/search_disk_index" \
+  --data_type float \
+  --dist_fn l2 \
+  --index_path_prefix "$DATA_DIR/disk_index_bigann_1B_R32_L50_A1.2" \
+  --query_file "$DATA_DIR/bigann_query.fbin" \
+  --gt_file "$DATA_DIR/bigann_1B_gt.bin" \
+  -K 10 -L 1 2 3 4 5 6 8 10 11 12 13 14 16 18 20 -T 1 \
   --result_path "$DATA_DIR/res" \
   --num_nodes_to_cache 400000000

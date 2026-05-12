@@ -315,7 +315,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         delete[] stats;
     }
 
-    const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
+    const std::string csv_result_path = "compressed_" + index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
                                         std::to_string(num_threads) + "_search_result.csv";
     std::ofstream csv_out(csv_result_path);
     if (csv_out.is_open())
