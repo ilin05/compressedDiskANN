@@ -8,7 +8,7 @@ SIFT_DIR="$BUILD_DIR/data/sift"
 MNIST_DIR="$BUILD_DIR/data/mnist"
 GIST_DIR="$BUILD_DIR/data/gist"
 FASHION_DIR="$BUILD_DIR/data/fashion-mnist"
-DEEP_DIR="$BUILD_DIR/data/deep"
+DEEP_DIR="$BUILD_DIR/data/deep1b"
 
 # "$BUILD_DIR/apps/search_disk_index" \
 
