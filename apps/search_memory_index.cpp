@@ -31,7 +31,8 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                         const std::string &query_file, const std::string &truthset_file, const uint32_t num_threads,
                         const uint32_t recall_at, const bool print_all_recalls, const std::vector<uint32_t> &Lvec,
                         const bool dynamic, const bool tags, const bool show_qps_per_thread,
-                        const std::vector<std::string> &query_filters, const float fail_if_recall_below)
+                        const std::vector<std::string> &query_filters, const float fail_if_recall_below,
+                        const uint32_t num_rounds = 1)
 {
     using TagT = uint32_t;
     struct SearchCsvRow
@@ -138,6 +139,11 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
     }
     std::cout << std::endl;
     std::cout << std::string(table_width, '=') << std::endl;
+    if (num_rounds > 1)
+    {
+        std::cout << "Testing with " << num_rounds << " rounds per L value. Results are averaged across rounds."
+                  << std::endl;
+    }
 
     std::vector<std::vector<uint32_t>> query_result_ids(Lvec.size());
     std::vector<std::vector<float>> query_result_dists(Lvec.size());
@@ -170,103 +176,154 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
         query_result_dists[test_id].resize(recall_at * query_num);
         std::vector<T *> res = std::vector<T *>();
 
-        auto s = std::chrono::high_resolution_clock::now();
-        omp_set_num_threads(num_threads);
-#pragma omp parallel for schedule(dynamic, 1)
-        for (int64_t i = 0; i < (int64_t)query_num; i++)
-        {
-            auto qs = std::chrono::high_resolution_clock::now();
-            if (filtered_search && !tags)
-            {
-                std::string raw_filter = query_filters.size() == 1 ? query_filters[0] : query_filters[i];
+        // Accumulate statistics across num_rounds
+        std::vector<double> accumulated_qps;
+        std::vector<double> accumulated_mean_latency;
+        std::vector<double> accumulated_latency_999;
+        std::vector<double> accumulated_avg_cmps;
+        std::vector<std::vector<double>> accumulated_recalls_per_round;
 
-                auto retval = index->search_with_filters(query + i * query_aligned_dim, raw_filter, recall_at, L,
-                                                         query_result_ids[test_id].data() + i * recall_at,
-                                                         query_result_dists[test_id].data() + i * recall_at);
-                cmp_stats[i] = retval.second;
-            }
-            else if (metric == diskann::FAST_L2)
+        for (uint32_t round = 0; round < num_rounds; round++)
+        {
+            // Reset latency and cmp stats for this round
+            std::fill(latency_stats.begin(), latency_stats.end(), 0);
+            if (not tags || filtered_search)
             {
-                index->search_with_optimized_layout(query + i * query_aligned_dim, recall_at, L,
-                                                    query_result_ids[test_id].data() + i * recall_at);
+                std::fill(cmp_stats.begin(), cmp_stats.end(), 0);
             }
-            else if (tags)
+
+            auto s = std::chrono::high_resolution_clock::now();
+            omp_set_num_threads(num_threads);
+#pragma omp parallel for schedule(dynamic, 1)
+            for (int64_t i = 0; i < (int64_t)query_num; i++)
             {
-                if (!filtered_search)
-                {
-                    index->search_with_tags(query + i * query_aligned_dim, recall_at, L,
-                                            query_result_tags.data() + i * recall_at, nullptr, res);
-                }
-                else
+                auto qs = std::chrono::high_resolution_clock::now();
+                if (filtered_search && !tags)
                 {
                     std::string raw_filter = query_filters.size() == 1 ? query_filters[0] : query_filters[i];
 
-                    index->search_with_tags(query + i * query_aligned_dim, recall_at, L,
-                                            query_result_tags.data() + i * recall_at, nullptr, res, true, raw_filter);
+                    auto retval = index->search_with_filters(query + i * query_aligned_dim, raw_filter, recall_at, L,
+                                                             query_result_ids[test_id].data() + i * recall_at,
+                                                             query_result_dists[test_id].data() + i * recall_at);
+                    cmp_stats[i] = retval.second;
                 }
-
-                for (int64_t r = 0; r < (int64_t)recall_at; r++)
+                else if (metric == diskann::FAST_L2)
                 {
-                    query_result_ids[test_id][recall_at * i + r] = query_result_tags[recall_at * i + r];
+                    index->search_with_optimized_layout(query + i * query_aligned_dim, recall_at, L,
+                                                        query_result_ids[test_id].data() + i * recall_at);
+                }
+                else if (tags)
+                {
+                    if (!filtered_search)
+                    {
+                        index->search_with_tags(query + i * query_aligned_dim, recall_at, L,
+                                                query_result_tags.data() + i * recall_at, nullptr, res);
+                    }
+                    else
+                    {
+                        std::string raw_filter = query_filters.size() == 1 ? query_filters[0] : query_filters[i];
+
+                        index->search_with_tags(query + i * query_aligned_dim, recall_at, L,
+                                                query_result_tags.data() + i * recall_at, nullptr, res, true, raw_filter);
+                    }
+
+                    for (int64_t r = 0; r < (int64_t)recall_at; r++)
+                    {
+                        query_result_ids[test_id][recall_at * i + r] = query_result_tags[recall_at * i + r];
+                    }
+                }
+                else
+                {
+                    cmp_stats[i] = index
+                                       ->search(query + i * query_aligned_dim, recall_at, L,
+                                                query_result_ids[test_id].data() + i * recall_at)
+                                       .second;
+                }
+                auto qe = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> diff = qe - qs;
+                latency_stats[i] = (float)(diff.count() * 1000000);
+            }
+            std::chrono::duration<double> diff = std::chrono::high_resolution_clock::now() - s;
+
+            double displayed_qps = query_num / diff.count();
+
+            if (show_qps_per_thread)
+                displayed_qps /= num_threads;
+
+            accumulated_qps.push_back(displayed_qps);
+
+            std::vector<double> recalls;
+            if (calc_recall_flag)
+            {
+                recalls.reserve(recalls_to_print);
+                for (uint32_t curr_recall = first_recall; curr_recall <= recall_at; curr_recall++)
+                {
+                    recalls.push_back(diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
+                                                                query_result_ids[test_id].data(), recall_at, curr_recall));
                 }
             }
-            else
-            {
-                cmp_stats[i] = index
-                                   ->search(query + i * query_aligned_dim, recall_at, L,
-                                            query_result_ids[test_id].data() + i * recall_at)
-                                   .second;
-            }
-            auto qe = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> diff = qe - qs;
-            latency_stats[i] = (float)(diff.count() * 1000000);
+            accumulated_recalls_per_round.push_back(recalls);
+
+            std::sort(latency_stats.begin(), latency_stats.end());
+            double mean_latency =
+                std::accumulate(latency_stats.begin(), latency_stats.end(), 0.0) / static_cast<float>(query_num);
+            accumulated_mean_latency.push_back(mean_latency);
+
+            double latency_999_val = latency_stats[(uint64_t)(0.999 * query_num)];
+            accumulated_latency_999.push_back(latency_999_val);
+
+            float avg_cmps = (float)std::accumulate(cmp_stats.begin(), cmp_stats.end(), 0) / (float)query_num;
+            accumulated_avg_cmps.push_back(avg_cmps);
         }
-        std::chrono::duration<double> diff = std::chrono::high_resolution_clock::now() - s;
 
-        double displayed_qps = query_num / diff.count();
+        // Calculate averages across rounds
+        double avg_qps = std::accumulate(accumulated_qps.begin(), accumulated_qps.end(), 0.0) / num_rounds;
+        double avg_mean_latency = std::accumulate(accumulated_mean_latency.begin(), accumulated_mean_latency.end(), 0.0) / num_rounds;
+        double avg_latency_999 = std::accumulate(accumulated_latency_999.begin(), accumulated_latency_999.end(), 0.0) / num_rounds;
+        double avg_cmp = std::accumulate(accumulated_avg_cmps.begin(), accumulated_avg_cmps.end(), 0.0) / num_rounds;
 
-        if (show_qps_per_thread)
-            displayed_qps /= num_threads;
-
-        std::vector<double> recalls;
-        if (calc_recall_flag)
+        // Average recalls across rounds
+        std::vector<double> avg_recalls;
+        if (!accumulated_recalls_per_round.empty() && !accumulated_recalls_per_round[0].empty())
         {
-            recalls.reserve(recalls_to_print);
-            for (uint32_t curr_recall = first_recall; curr_recall <= recall_at; curr_recall++)
+            size_t num_recalls = accumulated_recalls_per_round[0].size();
+            for (size_t r = 0; r < num_recalls; r++)
             {
-                recalls.push_back(diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
-                                                            query_result_ids[test_id].data(), recall_at, curr_recall));
+                double sum_recall = 0.0;
+                for (const auto &recalls : accumulated_recalls_per_round)
+                {
+                    sum_recall += recalls[r];
+                }
+                avg_recalls.push_back(sum_recall / num_rounds);
+                if (r == accumulated_recalls_per_round[0].size() - 1)
+                {
+                    // Use the last (highest) recall for best_recall tracking
+                    best_recall = std::max(avg_recalls.back(), best_recall);
+                }
             }
         }
-
-        std::sort(latency_stats.begin(), latency_stats.end());
-        double mean_latency =
-            std::accumulate(latency_stats.begin(), latency_stats.end(), 0.0) / static_cast<float>(query_num);
-
-        float avg_cmps = (float)std::accumulate(cmp_stats.begin(), cmp_stats.end(), 0) / (float)query_num;
 
         if (tags && !filtered_search)
         {
-            std::cout << std::setw(4) << L << std::setw(12) << displayed_qps << std::setw(20) << (float)mean_latency
-                      << std::setw(15) << (float)latency_stats[(uint64_t)(0.999 * query_num)];
+            std::cout << std::setw(4) << L << std::setw(12) << avg_qps << std::setw(20) << (float)avg_mean_latency
+                      << std::setw(15) << (float)avg_latency_999;
         }
         else
         {
-            std::cout << std::setw(4) << L << std::setw(12) << displayed_qps << std::setw(18) << avg_cmps
-                      << std::setw(20) << (float)mean_latency << std::setw(15)
-                      << (float)latency_stats[(uint64_t)(0.999 * query_num)];
+            std::cout << std::setw(4) << L << std::setw(12) << avg_qps << std::setw(18) << avg_cmp
+                      << std::setw(20) << (float)avg_mean_latency << std::setw(15) << (float)avg_latency_999;
         }
-        for (double recall : recalls)
+        for (double recall : avg_recalls)
         {
             std::cout << std::setw(12) << recall;
-            best_recall = std::max(recall, best_recall);
         }
         std::cout << std::endl;
 
-        const double recall_for_csv = recalls.empty() ? 0.0 : recalls.back();
-        csv_rows.push_back(SearchCsvRow{L, displayed_qps, avg_cmps, mean_latency,
-                                        latency_stats[(uint64_t)(0.999 * query_num)], recall_for_csv,
-                                        calc_recall_flag});
+        const double recall_for_csv = avg_recalls.empty() ? 0.0 : avg_recalls.back();
+        csv_rows.push_back(
+            SearchCsvRow{L, avg_qps, (float)avg_cmp, (float)avg_mean_latency,
+                         (float)avg_latency_999, recall_for_csv,
+                         calc_recall_flag});
     }
 
     const std::string csv_result_path = index_path + "_K" + std::to_string(recall_at) + "_T" +
@@ -320,7 +377,7 @@ int main(int argc, char **argv)
 {
     std::string data_type, dist_fn, index_path_prefix, result_path, query_file, gt_file, filter_label, label_type,
         query_filters_file;
-    uint32_t num_threads, K;
+    uint32_t num_threads, K, num_rounds;
     std::vector<uint32_t> Lvec;
     bool print_all_recalls, dynamic, tags, show_qps_per_thread;
     float fail_if_recall_below = 0.0f;
@@ -381,9 +438,13 @@ int main(int argc, char **argv)
         output_controls.add_options()("print_qps_per_thread", po::bool_switch(&show_qps_per_thread),
                                       "Print overall QPS divided by the number of threads in "
                                       "the output table");
+        po::options_description optional_configs2("More Optional");
+        optional_configs2.add_options()("num_rounds,R",
+                                        po::value<uint32_t>(&num_rounds)->default_value(1),
+                                        "Number of search rounds per L value. Results are averaged across rounds. Default: 1");
 
         // Merge required and optional parameters
-        desc.add(required_configs).add(optional_configs).add(output_controls);
+        desc.add(required_configs).add(optional_configs).add(output_controls).add(optional_configs2);
 
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -462,19 +523,19 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float, uint16_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                             num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                            show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                            show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else
             {
@@ -488,19 +549,19 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                    num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                   show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                   show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                     num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                    show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                    show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                   num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                  show_qps_per_thread, query_filters, fail_if_recall_below);
+                                                  show_qps_per_thread, query_filters, fail_if_recall_below, num_rounds);
             }
             else
             {

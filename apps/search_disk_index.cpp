@@ -54,7 +54,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const uint32_t num_threads, const uint32_t recall_at, const uint32_t beamwidth,
                       const uint32_t num_nodes_to_cache, const uint32_t search_io_limit,
                       const std::vector<uint32_t> &Lvec, const float fail_if_recall_below,
-                      const std::vector<std::string> &query_filters, const bool use_reorder_data = false)
+                      const std::vector<std::string> &query_filters, const bool use_reorder_data = false,
+                      const uint32_t num_rounds = 1)
 {
     struct SearchCsvRow
     {
@@ -193,6 +194,11 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     diskann::cout.setf(std::ios_base::fixed, std::ios_base::floatfield);
     diskann::cout.precision(2);
 
+    if (num_rounds > 1)
+    {
+        diskann::cout << "Testing with " << num_rounds << " rounds per L value." << std::endl;
+    }
+
     std::string recall_string = "Recall@" + std::to_string(recall_at);
     diskann::cout << std::setw(6) << "L" << std::setw(12) << "Beamwidth" << std::setw(16) << "QPS" << std::setw(16)
                   << "Mean Latency" << std::setw(16) << "99.9 Latency" << std::setw(16) << "Mean IOs" << std::setw(16)
@@ -237,81 +243,120 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         query_result_ids[test_id].resize(recall_at * query_num);
         query_result_dists[test_id].resize(recall_at * query_num);
 
-        auto stats = new diskann::QueryStats[query_num];
+        // Accumulate statistics across num_rounds
+        std::vector<double> accumulated_qps;
+        std::vector<double> accumulated_mean_latency;
+        std::vector<double> accumulated_latency_999;
+        std::vector<double> accumulated_mean_ios;
+        std::vector<double> accumulated_mean_io_us;
+        std::vector<double> accumulated_mean_cpuus;
+        std::vector<double> accumulated_recalls;
 
-        std::vector<uint64_t> query_result_ids_64(recall_at * query_num);
-        auto s = std::chrono::high_resolution_clock::now();
+        for (uint32_t round = 0; round < num_rounds; round++)
+        {
+            auto stats = new diskann::QueryStats[query_num];
+            std::vector<uint64_t> query_result_ids_64(recall_at * query_num);
+
+            auto s = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel for schedule(dynamic, 1)
-        for (int64_t i = 0; i < (int64_t)query_num; i++)
-        {
-            if (!filtered_search)
+            for (int64_t i = 0; i < (int64_t)query_num; i++)
             {
-                _pFlashIndex->cached_beam_search(query + (i * query_aligned_dim), recall_at, L,
-                                                 query_result_ids_64.data() + (i * recall_at),
-                                                 query_result_dists[test_id].data() + (i * recall_at),
-                                                 optimized_beamwidth, use_reorder_data, stats + i);
-            }
-            else
-            {
-                LabelT label_for_search;
-                if (query_filters.size() == 1)
-                { // one label for all queries
-                    label_for_search = _pFlashIndex->get_converted_label(query_filters[0]);
+                if (!filtered_search)
+                {
+                    _pFlashIndex->cached_beam_search(query + (i * query_aligned_dim), recall_at, L,
+                                                     query_result_ids_64.data() + (i * recall_at),
+                                                     query_result_dists[test_id].data() + (i * recall_at),
+                                                     optimized_beamwidth, use_reorder_data, stats + i);
                 }
                 else
-                { // one label for each query
-                    label_for_search = _pFlashIndex->get_converted_label(query_filters[i]);
+                {
+                    LabelT label_for_search;
+                    if (query_filters.size() == 1)
+                    { // one label for all queries
+                        label_for_search = _pFlashIndex->get_converted_label(query_filters[0]);
+                    }
+                    else
+                    { // one label for each query
+                        label_for_search = _pFlashIndex->get_converted_label(query_filters[i]);
+                    }
+                    _pFlashIndex->cached_beam_search(
+                        query + (i * query_aligned_dim), recall_at, L, query_result_ids_64.data() + (i * recall_at),
+                        query_result_dists[test_id].data() + (i * recall_at), optimized_beamwidth, true, label_for_search,
+                        use_reorder_data, stats + i);
                 }
-                _pFlashIndex->cached_beam_search(
-                    query + (i * query_aligned_dim), recall_at, L, query_result_ids_64.data() + (i * recall_at),
-                    query_result_dists[test_id].data() + (i * recall_at), optimized_beamwidth, true, label_for_search,
-                    use_reorder_data, stats + i);
             }
+
+            auto e = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> diff = e - s;
+            double qps = (1.0 * query_num) / (1.0 * diff.count());
+            accumulated_qps.push_back(qps);
+
+            // Only copy results from the first round
+            if (round == 0)
+            {
+                diskann::convert_types<uint64_t, uint32_t>(query_result_ids_64.data(), query_result_ids[test_id].data(),
+                                                           query_num, recall_at);
+            }
+
+            auto mean_latency = diskann::get_mean_stats<float>(
+                stats, query_num, [](const diskann::QueryStats &stats) { return stats.total_us; });
+            accumulated_mean_latency.push_back(mean_latency);
+
+            auto latency_999 = diskann::get_percentile_stats<float>(
+                stats, query_num, 0.999, [](const diskann::QueryStats &stats) { return stats.total_us; });
+            accumulated_latency_999.push_back(latency_999);
+
+            auto mean_ios = diskann::get_mean_stats<uint32_t>(stats, query_num,
+                                                              [](const diskann::QueryStats &stats) { return stats.n_ios; });
+            accumulated_mean_ios.push_back(mean_ios);
+
+            auto mean_io_us = diskann::get_mean_stats<float>(stats, query_num,
+                                                             [](const diskann::QueryStats &stats) { return stats.io_us; });
+            accumulated_mean_io_us.push_back(mean_io_us);
+
+            auto mean_cpuus = diskann::get_mean_stats<float>(stats, query_num,
+                                                             [](const diskann::QueryStats &stats) { return stats.cpu_us; });
+            accumulated_mean_cpuus.push_back(mean_cpuus);
+
+            if (calc_recall_flag)
+            {
+                double recall = diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
+                                                          query_result_ids[test_id].data(), recall_at, recall_at);
+                accumulated_recalls.push_back(recall);
+            }
+
+            delete[] stats;
         }
-        auto e = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> diff = e - s;
-        double qps = (1.0 * query_num) / (1.0 * diff.count());
 
-        diskann::convert_types<uint64_t, uint32_t>(query_result_ids_64.data(), query_result_ids[test_id].data(),
-                                                   query_num, recall_at);
+        // Calculate averages across rounds
+        double avg_qps = std::accumulate(accumulated_qps.begin(), accumulated_qps.end(), 0.0) / num_rounds;
+        double avg_mean_latency = std::accumulate(accumulated_mean_latency.begin(), accumulated_mean_latency.end(), 0.0) / num_rounds;
+        double avg_latency_999 = std::accumulate(accumulated_latency_999.begin(), accumulated_latency_999.end(), 0.0) / num_rounds;
+        double avg_mean_ios = std::accumulate(accumulated_mean_ios.begin(), accumulated_mean_ios.end(), 0.0) / num_rounds;
+        double avg_mean_io_us = std::accumulate(accumulated_mean_io_us.begin(), accumulated_mean_io_us.end(), 0.0) / num_rounds;
+        double avg_mean_cpuus = std::accumulate(accumulated_mean_cpuus.begin(), accumulated_mean_cpuus.end(), 0.0) / num_rounds;
 
-        auto mean_latency = diskann::get_mean_stats<float>(
-            stats, query_num, [](const diskann::QueryStats &stats) { return stats.total_us; });
-
-        auto latency_999 = diskann::get_percentile_stats<float>(
-            stats, query_num, 0.999, [](const diskann::QueryStats &stats) { return stats.total_us; });
-
-        auto mean_ios = diskann::get_mean_stats<uint32_t>(stats, query_num,
-                                                          [](const diskann::QueryStats &stats) { return stats.n_ios; });
-
-        auto mean_cpuus = diskann::get_mean_stats<float>(stats, query_num,
-                                                         [](const diskann::QueryStats &stats) { return stats.cpu_us; });
-
-        auto mean_io_us = diskann::get_mean_stats<float>(stats, query_num,
-                                                         [](const diskann::QueryStats &stats) { return stats.io_us; });
-
-        double recall = 0;
+        double avg_recall = 0;
         if (calc_recall_flag)
         {
-            recall = diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
-                                               query_result_ids[test_id].data(), recall_at, recall_at);
-            best_recall = std::max(recall, best_recall);
+            avg_recall = std::accumulate(accumulated_recalls.begin(), accumulated_recalls.end(), 0.0) / num_rounds;
+            best_recall = std::max(avg_recall, best_recall);
         }
 
-        diskann::cout << std::setw(6) << L << std::setw(12) << optimized_beamwidth << std::setw(16) << qps
-                      << std::setw(16) << mean_latency << std::setw(16) << latency_999 << std::setw(16) << mean_ios
-                      << std::setw(16) << mean_io_us << std::setw(16) << mean_cpuus;
+        diskann::cout << std::setw(6) << L << std::setw(12) << optimized_beamwidth << std::setw(16) << avg_qps
+                      << std::setw(16) << avg_mean_latency << std::setw(16) << avg_latency_999 << std::setw(16) << avg_mean_ios
+                      << std::setw(16) << avg_mean_io_us << std::setw(16) << avg_mean_cpuus;
         if (calc_recall_flag)
         {
-            diskann::cout << std::setw(16) << recall << std::endl;
+            diskann::cout << std::setw(16) << avg_recall << std::endl;
         }
         else
             diskann::cout << std::endl;
 
-        csv_rows.push_back(SearchCsvRow{L, optimized_beamwidth, qps, mean_latency, latency_999,
-                                        mean_ios, mean_io_us, mean_cpuus, recall, calc_recall_flag});
-        delete[] stats;
+        csv_rows.push_back(SearchCsvRow{L, optimized_beamwidth, avg_qps, avg_mean_latency, avg_latency_999,
+                                        avg_mean_ios, avg_mean_io_us, avg_mean_cpuus, avg_recall,
+                                        calc_recall_flag});
     }
 
     const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
@@ -363,7 +408,7 @@ int main(int argc, char **argv)
 {
     std::string data_type, dist_fn, index_path_prefix, result_path_prefix, query_file, gt_file, filter_label,
         label_type, query_filters_file;
-    uint32_t num_threads, K, W, num_nodes_to_cache, search_io_limit;
+    uint32_t num_threads, K, W, num_nodes_to_cache, search_io_limit, num_rounds;
     std::vector<uint32_t> Lvec;
     bool use_reorder_data = false;
     float fail_if_recall_below = 0.0f;
@@ -421,6 +466,9 @@ int main(int argc, char **argv)
         optional_configs.add_options()("fail_if_recall_below",
                                        po::value<float>(&fail_if_recall_below)->default_value(0.0f),
                                        program_options_utils::FAIL_IF_RECALL_BELOW);
+        optional_configs.add_options()("num_rounds,R",
+                                       po::value<uint32_t>(&num_rounds)->default_value(1),
+                                       "Number of search rounds per L value. Results are averaged across rounds. Default: 1");
 
         // Merge required and optional parameters
         desc.add(required_configs).add(optional_configs);
@@ -500,15 +548,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -520,15 +568,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
