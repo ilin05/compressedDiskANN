@@ -986,9 +986,20 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
             }
         }
 
+        // 原版 Vamana 逻辑：
+        // assert(dist_scratch.capacity() >= id_scratch.size());
+        // compute_dists(id_scratch, dist_scratch);
+        // cmps += (uint32_t)id_scratch.size();
+
+        // // Insert <id, dist> pairs into the pool of candidates
+        // for (size_t m = 0; m < id_scratch.size(); ++m)
+        // {
+        //     best_L_nodes.insert(Neighbor(id_scratch[m], dist_scratch[m]));
+        // }
+
         assert(dist_scratch.capacity() >= id_scratch.size());
         compute_dists(id_scratch, dist_scratch);
-        cmps += (uint32_t)id_scratch.size();
+        // cmps += (uint32_t)id_scratch.size(); // 这个 cmps 是用来统计 PQ 距离计算的数量的，不是精确距离的计算次数
 
         if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
         {
@@ -1004,6 +1015,7 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
 
             uint32_t rerank_count = std::max((uint32_t)1, (uint32_t)(temp_cands.size() * _pq_exact_rerank_ratio));
             rerank_count = std::min(rerank_count, (uint32_t)temp_cands.size());
+            cmps += rerank_count; // 这里的 cmps 统计的是精确距离计算的数量
 
             for (uint32_t m = 0; m < temp_cands.size(); ++m)
             {
@@ -1020,6 +1032,7 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
         }
         else
         {
+            cmps += (uint32_t)id_scratch.size(); // 这个 cmps 是用来统计 PQ 距离计算的数量的，不是精确距离的计算次数
             // Insert <id, dist> pairs into the pool of candidates
             for (size_t m = 0; m < id_scratch.size(); ++m)
             {
