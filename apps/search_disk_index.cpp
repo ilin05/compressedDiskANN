@@ -17,6 +17,7 @@
 
 #ifndef _WINDOWS
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "linux_aligned_file_reader.h"
@@ -48,6 +49,18 @@ void print_stats(std::string category, std::vector<float> percentiles, std::vect
     diskann::cout << std::endl;
 }
 
+size_t get_peak_rss_kb()
+{
+#ifndef _WINDOWS
+    struct rusage rusage;
+    if (getrusage(RUSAGE_SELF, &rusage) == 0)
+    {
+        return static_cast<size_t>(rusage.ru_maxrss);
+    }
+#endif
+    return 0;
+}
+
 template <typename T, typename LabelT = uint32_t>
 int search_disk_index(diskann::Metric &metric, const std::string &index_path_prefix,
                       const std::string &result_output_prefix, const std::string &query_file, std::string &gt_file,
@@ -68,6 +81,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         double mean_io_us;
         double mean_cpu_us;
         double recall;
+        size_t rss_after_cache_load_kb;
+        size_t rss_after_search_kb;
         bool has_recall;
     };
 
@@ -143,6 +158,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     //     _pFlashIndex->generate_cache_list_from_sample_queries(warmup_query_file, 15, 6, num_nodes_to_cache,
     //     num_threads, node_list);
     _pFlashIndex->load_cache_list(node_list);
+    const size_t rss_after_cache_load_kb = get_peak_rss_kb();
+    diskann::cout << "Peak RSS after cache load: " << rss_after_cache_load_kb << " KB" << std::endl;
     node_list.clear();
     node_list.shrink_to_fit();
 
@@ -353,25 +370,31 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         else
             diskann::cout << std::endl;
 
+        const size_t rss_after_search_kb = get_peak_rss_kb();
+        diskann::cout << "Peak RSS after search (L=" << L << "): " << rss_after_search_kb << " KB" << std::endl;
+
         csv_rows.push_back(SearchCsvRow{L, optimized_beamwidth, avg_qps, avg_mean_latency, avg_latency_999,
                                         avg_mean_ios, avg_mean_io_us, avg_mean_cpuus, avg_recall,
-                                        calc_recall_flag});
+                                        rss_after_cache_load_kb, rss_after_search_kb, calc_recall_flag});
     }
 
-    const std::string csv_result_path = "compressed_" + index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
-                                        std::to_string(num_threads) + "_search_result.csv";
+    const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
+                                        std::to_string(num_threads) + "_C" + std::to_string(num_nodes_to_cache) +
+                                        "_search_result.csv";
     std::ofstream csv_out(csv_result_path);
     if (csv_out.is_open())
     {
-        csv_out << "L,Beamwidth,QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@"
+        csv_out << "L,Beamwidth,Num_Nodes_To_Cache,RSS_After_Cache_Load(KB),RSS_After_Search(KB),"
+                << "QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@"
                 << recall_at << "\n";
         csv_out.setf(std::ios::fixed, std::ios::floatfield);
         csv_out.precision(6);
         for (const auto &row : csv_rows)
         {
-            csv_out << row.L << ',' << row.beamwidth << ',' << row.qps << ',' << row.mean_latency << ','
-                    << row.latency_999 << ',' << row.mean_ios << ',' << row.mean_io_us << ',' << row.mean_cpu_us
-                    << ',';
+            csv_out << row.L << ',' << row.beamwidth << ',' << num_nodes_to_cache << ','
+                    << row.rss_after_cache_load_kb << ',' << row.rss_after_search_kb << ','
+                    << row.qps << ',' << row.mean_latency << ',' << row.latency_999 << ',' << row.mean_ios << ','
+                    << row.mean_io_us << ',' << row.mean_cpu_us << ',';
             if (row.has_recall)
                 csv_out << row.recall;
             csv_out << "\n";
