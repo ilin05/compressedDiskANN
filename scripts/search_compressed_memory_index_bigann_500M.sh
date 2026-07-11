@@ -11,7 +11,7 @@ DATA_DIR="$BUILD_DIR/data/bigann"
   --index_path_prefix "$DATA_DIR/compressed_memory_index_bigann_500M_R32_L50_A1.2" \
   --gt_file "$DATA_DIR/bigann_500M_gt.bin" \
   --query_file "$DATA_DIR/bigann_query.fbin" \
-  -K 1 -L 2 4 6 8 10 -T 1 \
+  -K 1 -L 1 2 3 4 5 6 8 10 -T 1 -R 1 \
   --result_path "$DATA_DIR/res" \
   --use_pq_dist 1 \
   --pq_bytes 32 \
