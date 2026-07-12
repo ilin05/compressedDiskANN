@@ -15,12 +15,12 @@ DATA_DIR="$BUILD_DIR/data/bigann"
   --result_path "$DATA_DIR/res" \
   --num_nodes_to_cache 100000000
 
-"$BUILD_DIR/apps/search_disk_index" \
-  --data_type float \
-  --dist_fn l2 \
-  --index_path_prefix "$DATA_DIR/disk_index_bigann_500M_R32_L50_A1.2" \
-  --query_file "$DATA_DIR/bigann_query.fbin" \
-  --gt_file "$DATA_DIR/bigann_500M_gt.bin" \
-  -K 10 -L 10 11 12 13 14 16 18 20 -T 1 -R 100 \
-  --result_path "$DATA_DIR/res" \
-  --num_nodes_to_cache 100000000
+# "$BUILD_DIR/apps/search_disk_index" \
+#   --data_type float \
+#   --dist_fn l2 \
+#   --index_path_prefix "$DATA_DIR/disk_index_bigann_500M_R32_L50_A1.2" \
+#   --query_file "$DATA_DIR/bigann_query.fbin" \
+#   --gt_file "$DATA_DIR/bigann_500M_gt.bin" \
+#   -K 10 -L 10 11 12 13 14 16 18 20 -T 1 -R 1 \
+#   --result_path "$DATA_DIR/res" \
+#   --num_nodes_to_cache 100000000
