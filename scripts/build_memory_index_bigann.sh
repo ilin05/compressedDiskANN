@@ -1,0 +1,3 @@
+../build/apps/build_memory_index --data_type float --dist_fn l2 --data_path data/bigann/bigann_100M.fbin --index_path_prefix data/bigann/memory_index_bigann_100M_R32_L50_A1.2 -R 32 -L 50 -T 32 --alpha 1.2
+
+../build/apps/build_memory_index --data_type float --dist_fn l2 --data_path data/bigann/bigann_500M.fbin --index_path_prefix data/bigann/memory_index_bigann_500M_R32_L50_A1.2 -R 32 -L 50 -T 32 --alpha 1.2

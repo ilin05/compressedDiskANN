@@ -1,0 +1,3 @@
+../build/apps/build_disk_index --data_type float --dist_fn l2 --data_path data/bigann/bigann_500M.fbin --index_path_prefix data/bigann/disk_index_bigann_500M_R32_L50_A1.2 -R 32 -L 50 -B 15.5 -M 200 -T 32
+
+../build/apps/build_disk_index --data_type float --dist_fn l2 --data_path data/bigann/bigann_base.fbin --index_path_prefix data/bigann/disk_index_bigann_1B_R32_L50_A1.2 -R 32 -L50 -B 30.5 -M 400 -T 64
