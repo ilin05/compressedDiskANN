@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "hnswlib/compressed_codecs.h"
+#include "lvc_codec/hnswlib/compressed_codecs.h"
 
 namespace diskann::lvc {
 
