@@ -491,8 +491,13 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                     continue;
                 }
                 if (_cache_payload_mode == 1) {
-                    const uint8_t *byte_ptr = reinterpret_cast<const uint8_t *>(coord_buffers[i]);
-                    compressed_data.assign(byte_ptr, byte_ptr + _data_dim * sizeof(T));
+                    const size_t raw_bytes = _data_dim * sizeof(T);
+                    if (raw_bytes != 0) {
+                        if (coord_buffers[i] == nullptr)
+                            throw std::runtime_error("Raw disk cache vector missing");
+                        compressed_data.resize(raw_bytes);
+                        std::memcpy(compressed_data.data(), coord_buffers[i], raw_bytes);
+                    }
                 } else if (!_use_disk_index_pq) {
                     flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, compressed_data);
                 } else {
