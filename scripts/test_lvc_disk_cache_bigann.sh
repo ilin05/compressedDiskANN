@@ -13,29 +13,37 @@ CACHE_NODES="${CACHE_NODES:-10000}"
 THREADS="${THREADS:-1 4}"
 K="${K:-10}"
 L="${L:-50}"
-W="${W:-2}"
+CHECK_W=1
+PERF_W="${PERF_W:-${W:-2}}"
+RUN_PERF="${RUN_PERF:-1}"
 
 mkdir -p "$(dirname "$OUTPUT_PREFIX")"
 cmake --build "$BUILD_DIR" --target search_disk_index --parallel 4
 
+run_search() {
+  local phase="$1" codec="$2" thread_count="$3" beamwidth="$4"
+  local result_prefix="${OUTPUT_PREFIX}_${phase}_${codec}_T${thread_count}"
+  local csv_path="${INDEX_PREFIX}_K${K}_T${thread_count}_C${CACHE_NODES}_search_result.csv"
+  local verify_args=()
+  if [[ "$phase" == check && "$codec" != raw ]]; then verify_args+=(--verify_cache); fi
+  "$BUILD_DIR/apps/search_disk_index" \
+    --data_type float --dist_fn l2 --index_path_prefix "$INDEX_PREFIX" \
+    --query_file "$QUERY_FILE" --gt_file "$GT_FILE" \
+    -K "$K" -L "$L" -W "$beamwidth" -T "$thread_count" \
+    --num_nodes_to_cache "$CACHE_NODES" --cache_codec "$codec" \
+    --result_path "$result_prefix" "${verify_args[@]}" \
+    > "${result_prefix}.log" 2>&1
+  cp "$csv_path" "${result_prefix}.csv"
+  grep -E 'LVC disk cache mode|LVC disk cache PASS|Peak RSS' "${result_prefix}.log" | tail -n 5 || true
+}
+
 for thread_count in $THREADS; do
+  echo "Correctness: threads=$thread_count beamwidth=$CHECK_W"
   for codec in raw dexor gorilla elf; do
-    result_prefix="${OUTPUT_PREFIX}_${codec}_T${thread_count}"
-    verify_args=()
-    if [[ "$codec" != raw ]]; then verify_args+=(--verify_cache); fi
-    "$BUILD_DIR/apps/search_disk_index" \
-      --data_type float --dist_fn l2 --index_path_prefix "$INDEX_PREFIX" \
-      --query_file "$QUERY_FILE" --gt_file "$GT_FILE" \
-      -K "$K" -L "$L" -W "$W" -T "$thread_count" \
-      --num_nodes_to_cache "$CACHE_NODES" --cache_codec "$codec" \
-      --result_path "$result_prefix" "${verify_args[@]}" \
-      > "${result_prefix}.log" 2>&1
-    csv_path="${INDEX_PREFIX}_K${K}_T${thread_count}_C${CACHE_NODES}_search_result.csv"
-    if [[ -f "$csv_path" ]]; then cp "$csv_path" "${result_prefix}.csv"; fi
-    grep -E 'LVC disk cache|^LVC disk cache PASS|Peak RSS|QPS' "${result_prefix}.log" | tail -n 8 || true
+    run_search check "$codec" "$thread_count" "$CHECK_W"
   done
 
-  python3 - "$OUTPUT_PREFIX" "$thread_count" "$L" "$K" <<'PY'
+  python3 - "${OUTPUT_PREFIX}_check" "$thread_count" "$L" "$K" <<'PY'
 import pathlib
 import csv
 import re
@@ -78,4 +86,26 @@ for codec in ('raw', 'dexor', 'gorilla', 'elf'):
           f'mean_us={row["Mean Latency (mus)"]} p999_us={row["99.9 Latency"]} '
           f'mean_IOs={row["Mean IOs"]}')
 PY
+
+  if [[ "$RUN_PERF" == 1 ]]; then
+    echo "Performance: threads=$thread_count beamwidth=$PERF_W"
+    for codec in raw dexor gorilla elf; do
+      run_search perf "$codec" "$thread_count" "$PERF_W"
+    done
+    python3 - "${OUTPUT_PREFIX}_perf" "$thread_count" <<'PY'
+import csv
+import pathlib
+import sys
+
+prefix, threads = sys.argv[1:]
+for codec in ('raw', 'dexor', 'gorilla', 'elf'):
+    with pathlib.Path(f'{prefix}_{codec}_T{threads}.csv').open(newline='') as file:
+        row = next(csv.DictReader(file))
+    recall_column = next((name for name in row if name.startswith('Recall@')), None)
+    recall = f' recall={row[recall_column]}' if recall_column and row[recall_column] else ''
+    print(f'{codec} T={threads} QPS={row["QPS"]} '
+          f'mean_us={row["Mean Latency (mus)"]} p999_us={row["99.9 Latency"]} '
+          f'mean_IOs={row["Mean IOs"]}{recall}')
+PY
+  fi
 done
