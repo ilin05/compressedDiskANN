@@ -3,6 +3,7 @@
 
 #include <omp.h>
 
+#include <cmath>
 #include <type_traits>
 
 #include "boost/dynamic_bitset.hpp"
@@ -2352,6 +2353,33 @@ template <typename T, typename TagT, typename LabelT> size_t Index<T, TagT, Labe
 template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::set_pq_exact_rerank_ratio(float ratio)
 {
     _pq_exact_rerank_ratio = ratio;
+}
+
+template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::set_lvc_state_cache_ratio(float ratio)
+{
+    if (!std::isfinite(ratio) || ratio < 0.0f || ratio > 0.01f)
+        throw std::runtime_error("LVC state cache ratio must be between 0 and 0.01");
+    auto store = std::dynamic_pointer_cast<InMemDataStore<T>>(_data_store);
+    if (store == nullptr) return;
+    auto roots = store->lvc_roots();
+    if (roots.empty() || ratio == 0.0f) {
+        store->load_lvc_state_cache({});
+        return;
+    }
+    std::sort(roots.begin(), roots.end(), [&](uint32_t a, uint32_t b) {
+        const size_t da = _graph_store->get_neighbours(a).size();
+        const size_t db = _graph_store->get_neighbours(b).size();
+        return da != db ? da > db : a < b;
+    });
+    const size_t requested = ratio == 0.01f ? std::max<size_t>(1, _nd / 100)
+                                           : std::max<size_t>(1, size_t(double(_nd) * ratio));
+    if (requested > roots.size())
+        throw std::runtime_error("LVC state cache ratio exceeds the root count");
+    diskann::cout << "LVC Vamana forest roots=" << roots.size()
+                  << " state_cache_roots=" << requested
+                  << " nodes=" << _nd << std::endl;
+    roots.resize(requested);
+    store->load_lvc_state_cache(roots);
 }
 
 template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::generate_frozen_point()

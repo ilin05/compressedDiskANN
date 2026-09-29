@@ -87,6 +87,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     DISKANN_DLLEXPORT size_t get_num_points();
     DISKANN_DLLEXPORT size_t get_max_points();
     DISKANN_DLLEXPORT void set_pq_exact_rerank_ratio(float ratio);
+    DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio) override;
 
     DISKANN_DLLEXPORT bool detect_common_filters(uint32_t point_id, bool search_invocation,
                                                  const std::vector<LabelT> &incoming_labels);

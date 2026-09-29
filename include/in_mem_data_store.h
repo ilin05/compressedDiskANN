@@ -16,6 +16,7 @@
 #include "natural_number_map.h"
 #include "natural_number_set.h"
 #include "aligned_file_reader.h"
+#include "lvc_forest.h"
 
 namespace diskann
 {
@@ -58,6 +59,9 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
 
     virtual location_t calculate_medoid() const override;
 
+    std::vector<uint32_t> lvc_roots() const;
+    void load_lvc_state_cache(const std::vector<uint32_t> &roots);
+
     virtual Distance<data_t> *get_dist_fn() const override;
 
     virtual size_t get_alignment_factor() const override;
@@ -87,6 +91,9 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
     std::vector<uint32_t> _lvc_parent;
     std::vector<uint8_t> _lvc_depth;
     std::vector<uint64_t> _lvc_lengths;
+    std::unique_ptr<lvc::RootStateCache<hnswlib::codecs::DeXORCodecPolicy>> _dexor_state_cache;
+    std::unique_ptr<lvc::RootStateCache<hnswlib::codecs::GorillaCodecPolicy>> _gorilla_state_cache;
+    std::unique_ptr<lvc::RootStateCache<hnswlib::codecs::ElfCodecPolicy>> _elf_state_cache;
 
     size_t _aligned_dim;
 

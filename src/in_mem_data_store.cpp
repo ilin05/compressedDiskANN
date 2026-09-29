@@ -244,6 +244,10 @@ void InMemDataStore<data_t>::decode_lvc_record(location_t loc, data_t *out_vec) 
     {
         if (loc >= _lvc_parent.size()) throw std::runtime_error("LVC node out of bounds");
         std::vector<typename Codec::StateType> states(this->_dim);
+        const lvc::RootStateCache<Codec> *cache = nullptr;
+        if constexpr (std::is_same_v<Codec, hnswlib::codecs::DeXORCodecPolicy>) cache = _dexor_state_cache.get();
+        else if constexpr (std::is_same_v<Codec, hnswlib::codecs::GorillaCodecPolicy>) cache = _gorilla_state_cache.get();
+        else if constexpr (std::is_same_v<Codec, hnswlib::codecs::ElfCodecPolicy>) cache = _elf_state_cache.get();
         auto decode_one = [&](location_t id, data_t *target) {
             const size_t offset = _vector_offsets[id];
             const uint64_t length = _lvc_lengths[id];
@@ -252,8 +256,60 @@ void InMemDataStore<data_t>::decode_lvc_record(location_t loc, data_t *out_vec) 
             lvc::decode_record<Codec>(_compressed_data.data() + offset, length, states, target);
         };
         const uint32_t root = _lvc_parent[loc];
-        if (root != lvc::no_parent) decode_one(root, nullptr);
+        const auto *entry = cache == nullptr ? nullptr : cache->find(root == lvc::no_parent ? loc : root);
+        if (root == lvc::no_parent && entry != nullptr) {
+            std::copy(entry->vector.begin(), entry->vector.end(), out_vec);
+            return;
+        }
+        if (entry != nullptr) states = entry->states;
+        else if (root != lvc::no_parent) decode_one(root, nullptr);
         decode_one(loc, out_vec);
+    }
+}
+
+template <typename data_t>
+std::vector<uint32_t> InMemDataStore<data_t>::lvc_roots() const
+{
+    std::vector<uint32_t> roots;
+    for (uint32_t id = 0; id < _lvc_parent.size(); ++id)
+        if (_lvc_parent[id] == lvc::no_parent) roots.push_back(id);
+    return roots;
+}
+
+template <typename data_t>
+void InMemDataStore<data_t>::load_lvc_state_cache(const std::vector<uint32_t> &roots)
+{
+    _dexor_state_cache.reset();
+    _gorilla_state_cache.reset();
+    _elf_state_cache.reset();
+    if (roots.empty() || _lvc_mode < 2) return;
+    auto add_roots = [&](auto &cache) {
+        cache.reserve(roots.size());
+        for (uint32_t id : roots) {
+            if (id >= _lvc_parent.size() || _lvc_parent[id] != lvc::no_parent)
+                throw std::runtime_error("LVC state cache requires root IDs");
+            const size_t offset = _vector_offsets[id];
+            const uint64_t length = _lvc_lengths[id];
+            if (offset > _compressed_data.size() || length > _compressed_data.size() - offset)
+                throw std::runtime_error("LVC root record out of bounds");
+            cache.insert(id, _compressed_data.data() + offset, length, this->_dim);
+        }
+    };
+    if (_lvc_mode == 2) {
+        _dexor_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::DeXORCodecPolicy>>();
+        add_roots(*_dexor_state_cache);
+        diskann::cout << "LVC Vamana state cache roots=" << _dexor_state_cache->size()
+                      << " payload_bytes=" << _dexor_state_cache->payload_bytes() << std::endl;
+    } else if (_lvc_mode == 3) {
+        _gorilla_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::GorillaCodecPolicy>>();
+        add_roots(*_gorilla_state_cache);
+        diskann::cout << "LVC Vamana state cache roots=" << _gorilla_state_cache->size()
+                      << " payload_bytes=" << _gorilla_state_cache->payload_bytes() << std::endl;
+    } else if (_lvc_mode == 4) {
+        _elf_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::ElfCodecPolicy>>();
+        add_roots(*_elf_state_cache);
+        diskann::cout << "LVC Vamana state cache roots=" << _elf_state_cache->size()
+                      << " payload_bytes=" << _elf_state_cache->payload_bytes() << std::endl;
     }
 }
 
@@ -283,6 +339,7 @@ template <typename data_t> size_t InMemDataStore<data_t>::get_alignment_factor()
 
 template <typename data_t> location_t InMemDataStore<data_t>::load(const std::string &filename)
 {
+    load_lvc_state_cache({});
     return load_impl(filename);
 }
 

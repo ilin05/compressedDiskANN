@@ -32,13 +32,14 @@ namespace
 {
     template <typename Codec>
     uint64_t decode_lvc_cache_record(const lvc::RecordStore<Codec> &store, uint32_t id,
-                                     float *output, uint64_t &records)
+                                     const lvc::RootStateCache<Codec> *cache,
+                                     float *output, uint64_t &records, bool &cache_hit)
     {
         thread_local std::vector<typename Codec::StateType> states;
-        store.decode(id, output, states);
         const uint32_t root = store.forest.parent[id];
-        records = root == lvc::no_parent ? 1 : 2;
-        return store.lengths[id] + (root == lvc::no_parent ? 0 : store.lengths[root]);
+        cache_hit = cache != nullptr && cache->find(root == lvc::no_parent ? id : root) != nullptr;
+        store.decode(id, output, states, cache, &records);
+        return records == 0 ? 0 : store.lengths[id] + (records == 2 ? store.lengths[root] : 0);
     }
 
     struct FlashBitWriter {
@@ -378,6 +379,14 @@ void PQFlashIndex<T, LabelT>::set_cache_payload_mode(uint32_t mode, bool verify)
 }
 
 template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_lvc_state_cache_ratio(float ratio)
+{
+    if (!std::isfinite(ratio) || ratio < 0.0f || ratio > 0.01f)
+        throw std::runtime_error("LVC state cache ratio must be between 0 and 0.01");
+    _lvc_state_cache_ratio = ratio;
+}
+
+template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, QueryStats *stats) const
 {
     const auto found = _coord_cache.find(node_id);
@@ -391,12 +400,17 @@ void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, Q
     } else if constexpr (std::is_same_v<T, float>) {
         Timer decode_timer;
         uint64_t records = 0, bytes = 0;
-        if (_cache_payload_mode == 2) bytes = decode_lvc_cache_record(*_dexor_cache, position, output, records);
-        else if (_cache_payload_mode == 3) bytes = decode_lvc_cache_record(*_gorilla_cache, position, output, records);
-        else bytes = decode_lvc_cache_record(*_elf_cache, position, output, records);
+        bool state_hit = false;
+        if (_cache_payload_mode == 2) bytes = decode_lvc_cache_record(*_dexor_cache, position,
+            _dexor_state_cache.get(), output, records, state_hit);
+        else if (_cache_payload_mode == 3) bytes = decode_lvc_cache_record(*_gorilla_cache, position,
+            _gorilla_state_cache.get(), output, records, state_hit);
+        else bytes = decode_lvc_cache_record(*_elf_cache, position,
+            _elf_state_cache.get(), output, records, state_hit);
         std::fill(output + _data_dim, output + _aligned_dim, T{});
         if (stats != nullptr) {
             ++stats->lvc_decode_calls;
+            stats->lvc_state_cache_hits += state_hit;
             stats->lvc_replay_hops += records;
             stats->lvc_decode_bytes += bytes;
             stats->lvc_decode_us += static_cast<float>(decode_timer.elapsed());
@@ -532,6 +546,42 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector));
             payload_bytes = _elf_cache->bytes.size(); patches = _elf_cache->patches;
         }
+        _dexor_state_cache.reset();
+        _gorilla_state_cache.reset();
+        _elf_state_cache.reset();
+        size_t state_cache_bytes = 0, state_cache_roots = 0;
+        if (_lvc_state_cache_ratio > 0.0f) {
+            std::vector<uint32_t> roots;
+            roots.reserve(forest.initial_roots);
+            for (uint32_t id = 0; id < forest.parent.size(); ++id)
+                if (forest.parent[id] == lvc::no_parent) roots.push_back(id);
+            std::sort(roots.begin(), roots.end(), [&](uint32_t a, uint32_t b) {
+                const size_t da = neighbors[a].size(), db = neighbors[b].size();
+                return da != db ? da > db : a < b;
+            });
+            const size_t requested = _lvc_state_cache_ratio == 0.01f
+                ? std::max<size_t>(1, cached_ids.size() / 100)
+                : std::max<size_t>(1, size_t(double(cached_ids.size()) * _lvc_state_cache_ratio));
+            if (requested > roots.size()) throw std::runtime_error("LVC state cache ratio exceeds the root count");
+            roots.resize(requested);
+            auto fill_cache = [&](auto &cache, const auto &store) {
+                cache.reserve(roots.size());
+                for (uint32_t id : roots)
+                    cache.insert(id, store.bytes.data() + store.offsets[id], store.lengths[id], _data_dim);
+                state_cache_bytes = cache.payload_bytes();
+                state_cache_roots = cache.size();
+            };
+            if (_cache_payload_mode == 2) {
+                _dexor_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::DeXORCodecPolicy>>();
+                fill_cache(*_dexor_state_cache, *_dexor_cache);
+            } else if (_cache_payload_mode == 3) {
+                _gorilla_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::GorillaCodecPolicy>>();
+                fill_cache(*_gorilla_state_cache, *_gorilla_cache);
+            } else {
+                _elf_state_cache = std::make_unique<lvc::RootStateCache<hnswlib::codecs::ElfCodecPolicy>>();
+                fill_cache(*_elf_state_cache, *_elf_cache);
+            }
+        }
         const uint64_t metadata_bytes = cached_ids.size() * (sizeof(uint32_t) + sizeof(uint8_t) +
                                                                2 * sizeof(uint64_t));
         const uint64_t raw_bytes = raw_vectors.size() * sizeof(float);
@@ -542,6 +592,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                       << " raw_F32_bytes=" << raw_bytes
                       << " payload_ratio=" << (double(raw_bytes) / payload_bytes)
                       << " total_ratio=" << (double(raw_bytes) / (payload_bytes + metadata_bytes))
+                      << " state_cache_roots=" << state_cache_roots
+                      << " state_cache_payload_bytes=" << state_cache_bytes
                       << " build_seconds=" << build_timer.elapsed_seconds() << std::endl;
         if (_verify_cache_payload) {
             std::vector<T> decoded(_aligned_dim);

@@ -5,6 +5,8 @@
 #include <limits>
 #include <numeric>
 #include <stdexcept>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "lvc_f32_codec.h"
@@ -19,6 +21,40 @@ struct Forest {
     uint32_t initial_roots = 0;
     uint32_t fallback_nodes = 0;
     uint32_t propagation_rounds = 0;
+};
+
+template <typename Codec> class RootStateCache {
+  public:
+    struct Entry {
+        std::vector<typename Codec::StateType> states;
+        std::vector<float> vector;
+    };
+
+    void reserve(size_t count) { entries.reserve(count); }
+
+    void insert(uint32_t id, const uint8_t *record, size_t length, uint32_t dim) {
+        Entry entry;
+        entry.states.resize(dim);
+        entry.vector.resize(dim);
+        decode_record<Codec>(record, length, entry.states, entry.vector.data());
+        entries.emplace(id, std::move(entry));
+    }
+
+    const Entry *find(uint32_t id) const {
+        const auto it = entries.find(id);
+        return it == entries.end() ? nullptr : &it->second;
+    }
+
+    size_t size() const { return entries.size(); }
+
+    size_t payload_bytes() const {
+        if (entries.empty()) return 0;
+        return entries.size() * (entries.begin()->second.states.size() * sizeof(typename Codec::StateType) +
+                                 entries.begin()->second.vector.size() * sizeof(float));
+    }
+
+  private:
+    std::unordered_map<uint32_t, Entry> entries;
 };
 
 inline void validate_forest(const Forest &forest) {
@@ -174,12 +210,24 @@ template <typename Codec> class RecordStore {
         decode(id, output, states);
     }
 
-    void decode(uint32_t id, float *output, std::vector<typename Codec::StateType> &states) const {
+    void decode(uint32_t id, float *output, std::vector<typename Codec::StateType> &states,
+                const RootStateCache<Codec> *cache = nullptr, uint64_t *records = nullptr) const {
         if (id >= forest.parent.size() || output == nullptr) throw std::runtime_error("Invalid LVC decode target");
-        states.assign(dim, typename Codec::StateType{});
         const uint32_t root = forest.parent[id];
-        if (root != no_parent) decode_one(root, states, nullptr);
+        const auto *entry = cache == nullptr ? nullptr : cache->find(root == no_parent ? id : root);
+        if (root == no_parent && entry != nullptr) {
+            states = entry->states;
+            std::copy(entry->vector.begin(), entry->vector.end(), output);
+            if (records != nullptr) *records = 0;
+            return;
+        }
+        if (entry != nullptr) states = entry->states;
+        else {
+            states.assign(dim, typename Codec::StateType{});
+            if (root != no_parent) decode_one(root, states, nullptr);
+        }
         decode_one(id, states, output);
+        if (records != nullptr) *records = 1 + (root != no_parent && entry == nullptr ? 1 : 0);
     }
 
   private:

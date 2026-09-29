@@ -74,6 +74,23 @@ void test_codec(const char *name, const diskann::lvc::Forest &forest, const Inpu
     const auto vector = [&](uint32_t id) { return input.values.data() + size_t(id) * input.dim; };
     auto store = diskann::lvc::RecordStore<Codec>::build(forest, input.dim, vector);
     std::vector<float> decoded(input.dim);
+    diskann::lvc::RootStateCache<Codec> state_cache;
+    state_cache.reserve(forest.initial_roots);
+    for (uint32_t id = 0; id < input.count; ++id)
+        if (forest.parent[id] == diskann::lvc::no_parent)
+            state_cache.insert(id, store.bytes.data() + store.offsets[id], store.lengths[id], input.dim);
+    if (state_cache.size() != forest.initial_roots)
+        throw std::runtime_error("State cache root count mismatch");
+    diskann::lvc::RootStateCache<Codec> partial_cache;
+    const uint32_t cached_root = [&] {
+        for (uint32_t id = 0; id < input.count; ++id)
+            if (forest.parent[id] == diskann::lvc::no_parent) return id;
+        throw std::runtime_error("No root for state cache test");
+    }();
+    partial_cache.insert(cached_root, store.bytes.data() + store.offsets[cached_root],
+                         store.lengths[cached_root], input.dim);
+    std::vector<typename Codec::StateType> states;
+    std::vector<float> cached(input.dim);
     uint64_t correct_coordinates = 0;
     uint64_t correct_l2 = 0;
     uint32_t non_neighbor_parents = 0;
@@ -92,6 +109,18 @@ void test_codec(const char *name, const diskann::lvc::Forest &forest, const Inpu
             ++non_neighbor_parents;
         }
         store.decode(id, decoded.data());
+        uint64_t records = 0;
+        store.decode(id, cached.data(), states, &state_cache, &records);
+        const uint64_t expected_records = parent == diskann::lvc::no_parent ? 0 : 1;
+        if (records != expected_records || std::memcmp(decoded.data(), cached.data(),
+                                                        input.dim * sizeof(float)) != 0)
+            throw std::runtime_error(std::string(name) + " state cache mismatch at node " + std::to_string(id));
+        store.decode(id, cached.data(), states, &partial_cache, &records);
+        const uint64_t partial_records = (parent == diskann::lvc::no_parent ? 1 : 2) -
+                                         (id == cached_root || parent == cached_root ? 1 : 0);
+        if (records != partial_records || std::memcmp(decoded.data(), cached.data(),
+                                                     input.dim * sizeof(float)) != 0)
+            throw std::runtime_error(std::string(name) + " partial state cache mismatch at node " + std::to_string(id));
         for (uint32_t j = 0; j < input.dim; ++j) {
             if (diskann::lvc::bits(decoded[j]) != diskann::lvc::bits(vector(id)[j])) {
                 std::cerr << "FIRST_MISMATCH codec=" << name << " vector_id=" << id
