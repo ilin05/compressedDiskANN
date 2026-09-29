@@ -170,8 +170,13 @@ template <typename Codec> class RecordStore {
     }
 
     void decode(uint32_t id, float *output) const {
-        if (id >= forest.parent.size() || output == nullptr) throw std::runtime_error("Invalid LVC decode target");
         std::vector<typename Codec::StateType> states(dim);
+        decode(id, output, states);
+    }
+
+    void decode(uint32_t id, float *output, std::vector<typename Codec::StateType> &states) const {
+        if (id >= forest.parent.size() || output == nullptr) throw std::runtime_error("Invalid LVC decode target");
+        states.assign(dim, typename Codec::StateType{});
         const uint32_t root = forest.parent[id];
         if (root != no_parent) decode_one(root, states, nullptr);
         decode_one(id, states, output);

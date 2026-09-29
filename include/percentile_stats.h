@@ -33,6 +33,10 @@ struct QueryStats
     unsigned n_cmps = 0;       // # cmps
     unsigned n_cache_hits = 0; // # cache_hits
     unsigned n_hops = 0;       // # search hops
+    uint64_t lvc_decode_calls = 0;
+    uint64_t lvc_replay_hops = 0;
+    uint64_t lvc_decode_bytes = 0;
+    float lvc_decode_us = 0;
 };
 
 template <typename T>

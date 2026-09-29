@@ -30,6 +30,17 @@ namespace diskann
 
 namespace
 {
+    template <typename Codec>
+    uint64_t decode_lvc_cache_record(const lvc::RecordStore<Codec> &store, uint32_t id,
+                                     float *output, uint64_t &records)
+    {
+        thread_local std::vector<typename Codec::StateType> states;
+        store.decode(id, output, states);
+        const uint32_t root = store.forest.parent[id];
+        records = root == lvc::no_parent ? 1 : 2;
+        return store.lengths[id] + (root == lvc::no_parent ? 0 : store.lengths[root]);
+    }
+
     struct FlashBitWriter {
         std::vector<uint8_t>& buf;
         uint8_t cur_byte = 0;
@@ -358,10 +369,57 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
     return retval;
 }
 
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_cache_payload_mode(uint32_t mode, bool verify)
+{
+    if (mode > 4) throw std::runtime_error("Invalid disk cache payload mode");
+    _cache_payload_mode = mode;
+    _verify_cache_payload = verify;
+}
+
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, QueryStats *stats) const
+{
+    const auto found = _coord_cache.find(node_id);
+    if (found == _coord_cache.end()) throw std::runtime_error("Disk cache vector missing");
+    const size_t position = found->second;
+    if (_cache_payload_mode == 0) {
+        flash_decode_vector<T>(_compressed_coord_cache.data() + position, _data_dim, _aligned_dim, output);
+    } else if (_cache_payload_mode == 1) {
+        std::memcpy(output, _compressed_coord_cache.data() + position, _data_dim * sizeof(T));
+        std::fill(output + _data_dim, output + _aligned_dim, T{});
+    } else if constexpr (std::is_same_v<T, float>) {
+        Timer decode_timer;
+        uint64_t records = 0, bytes = 0;
+        if (_cache_payload_mode == 2) bytes = decode_lvc_cache_record(*_dexor_cache, position, output, records);
+        else if (_cache_payload_mode == 3) bytes = decode_lvc_cache_record(*_gorilla_cache, position, output, records);
+        else bytes = decode_lvc_cache_record(*_elf_cache, position, output, records);
+        std::fill(output + _data_dim, output + _aligned_dim, T{});
+        if (stats != nullptr) {
+            ++stats->lvc_decode_calls;
+            stats->lvc_replay_hops += records;
+            stats->lvc_decode_bytes += bytes;
+            stats->lvc_decode_us += static_cast<float>(decode_timer.elapsed());
+        }
+    }
+}
+
 template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_list(std::vector<uint32_t> &node_list)
 {
+    if (_cache_payload_mode != 0 &&
+        (!std::is_same_v<T, float> || metric != diskann::Metric::L2 || _use_disk_index_pq)) {
+        throw std::runtime_error("Raw/LVC disk cache requires F32/L2 with full-precision SSD vectors");
+    }
+    if (_cache_payload_mode >= 2 && node_list.empty())
+        throw std::runtime_error("LVC disk cache requires at least one cached node");
     diskann::cout << "Loading the cache list into memory.." << std::flush;
     size_t num_cached_nodes = node_list.size();
+    std::vector<uint32_t> cached_ids;
+    std::vector<float> raw_vectors;
+    if (_cache_payload_mode >= 2) {
+        cached_ids.reserve(num_cached_nodes);
+        raw_vectors.reserve(num_cached_nodes * _data_dim);
+    }
 
     // Allocate space for neighborhood cache
     // neighborhood cache 的大小取决于要缓存的节点数和每个节点的最大度数（即邻居数量）。对于每个要缓存的节点，我们需要为其邻居列表分配空间，邻居列表的长度由 _max_degree 决定。加1是为了存储邻居数量本身�?    _nhood_cache_buf = new uint32_t[num_cached_nodes * (_max_degree + 1)];
@@ -379,6 +437,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     memset(temp_coord_cache_buf, 0, temp_coord_cache_buf_len * sizeof(T));
     
     _compressed_coord_cache.clear();
+    if (_cache_payload_mode == 1)
+        _compressed_coord_cache.reserve(num_cached_nodes * _data_dim * sizeof(T));
 
     // calculate blocks
     size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, CHUNK_BLOCK_SIZE);
@@ -408,7 +468,18 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
             if (read_status[i] == true)
             {
                 std::vector<uint8_t> compressed_data;
-                if (!_use_disk_index_pq) {
+                if (_cache_payload_mode >= 2) {
+                    _coord_cache.insert(std::make_pair(nodes_to_read[i], cached_ids.size()));
+                    cached_ids.push_back(nodes_to_read[i]);
+                    for (size_t d = 0; d < _data_dim; ++d)
+                        raw_vectors.push_back(static_cast<float>(coord_buffers[i][d]));
+                    _nhood_cache.insert(std::make_pair(nodes_to_read[i], nbr_buffers[i]));
+                    continue;
+                }
+                if (_cache_payload_mode == 1) {
+                    const uint8_t *byte_ptr = reinterpret_cast<const uint8_t *>(coord_buffers[i]);
+                    compressed_data.assign(byte_ptr, byte_ptr + _data_dim * sizeof(T));
+                } else if (!_use_disk_index_pq) {
                     flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, compressed_data);
                 } else {
                     // if already using PQ, coord_buffers[i] holds _disk_bytes_per_point of uint8_t data.
@@ -429,6 +500,74 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
     }
     diskann::aligned_free(temp_coord_cache_buf);
+    if (_cache_payload_mode >= 2) {
+        Timer build_timer;
+        if (cached_ids.size() != num_cached_nodes)
+            throw std::runtime_error("Could not load all LVC disk cache nodes");
+        std::vector<std::vector<uint32_t>> neighbors(cached_ids.size());
+        for (size_t local = 0; local < cached_ids.size(); ++local) {
+            const auto nhood = _nhood_cache.find(cached_ids[local])->second;
+            neighbors[local].reserve(nhood.first);
+            for (uint32_t j = 0; j < nhood.first; ++j) {
+                const auto found = _coord_cache.find(nhood.second[j]);
+                if (found != _coord_cache.end()) neighbors[local].push_back(static_cast<uint32_t>(found->second));
+            }
+        }
+        auto vector = [&](uint32_t id) { return raw_vectors.data() + size_t(id) * _data_dim; };
+        const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
+                                              static_cast<uint32_t>(_data_dim),
+                                              [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
+                                              vector);
+        uint64_t payload_bytes = 0, patches = 0;
+        if (_cache_payload_mode == 2) {
+            _dexor_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>>(
+                lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>::build(forest, _data_dim, vector));
+            payload_bytes = _dexor_cache->bytes.size(); patches = _dexor_cache->patches;
+        } else if (_cache_payload_mode == 3) {
+            _gorilla_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>>(
+                lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>::build(forest, _data_dim, vector));
+            payload_bytes = _gorilla_cache->bytes.size(); patches = _gorilla_cache->patches;
+        } else {
+            _elf_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>>(
+                lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector));
+            payload_bytes = _elf_cache->bytes.size(); patches = _elf_cache->patches;
+        }
+        const uint64_t metadata_bytes = cached_ids.size() * (sizeof(uint32_t) + sizeof(uint8_t) +
+                                                               2 * sizeof(uint64_t));
+        const uint64_t raw_bytes = raw_vectors.size() * sizeof(float);
+        diskann::cout << "\nLVC disk cache mode=" << _cache_payload_mode << " nodes=" << cached_ids.size()
+                      << " roots=" << forest.initial_roots << " fallback=" << forest.fallback_nodes
+                      << " rounds=" << forest.propagation_rounds << " patches=" << patches
+                      << " payload_bytes=" << payload_bytes << " metadata_bytes=" << metadata_bytes
+                      << " raw_F32_bytes=" << raw_bytes
+                      << " payload_ratio=" << (double(raw_bytes) / payload_bytes)
+                      << " total_ratio=" << (double(raw_bytes) / (payload_bytes + metadata_bytes))
+                      << " build_seconds=" << build_timer.elapsed_seconds() << std::endl;
+        if (_verify_cache_payload) {
+            std::vector<T> decoded(_aligned_dim);
+            for (size_t local = 0; local < cached_ids.size(); ++local) {
+                decode_cache_vector(cached_ids[local], decoded.data());
+                for (size_t d = 0; d < _data_dim; ++d) {
+                    if (lvc::bits(decoded[d]) != lvc::bits(raw_vectors[local * _data_dim + d])) {
+                        std::ostringstream error;
+                        error << "LVC disk cache mismatch at node=" << cached_ids[local]
+                              << " coordinate=" << d << " actual=" << decoded[d]
+                              << " expected=" << raw_vectors[local * _data_dim + d]
+                              << " actual_decoded_vector=[";
+                        for (size_t coordinate = 0; coordinate < _data_dim; ++coordinate) {
+                            if (coordinate) error << ',';
+                            error << decoded[coordinate];
+                        }
+                        error << ']';
+                        throw std::runtime_error(error.str());
+                    }
+                }
+            }
+            diskann::cout << "LVC disk cache PASS bitwise vectors=" << cached_ids.size() << "/"
+                          << cached_ids.size() << " coordinates=" << raw_vectors.size() << "/"
+                          << raw_vectors.size() << std::endl;
+        }
+    }
     diskann::cout << "..done." << std::endl;
 }
 
@@ -1673,8 +1812,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             if (!_use_disk_index_pq)
             {
                 node_fp_coords_copy = data_buf;
-                size_t read_offset = node_offset;
-                flash_decode_vector<T>(_compressed_coord_cache.data() + read_offset, this->_data_dim, this->_aligned_dim, node_fp_coords_copy);
+                decode_cache_vector(cached_nhood.first, node_fp_coords_copy, stats);
                 cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
             }
             else
@@ -1812,8 +1950,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         if (!_use_disk_index_pq)
         {
             node_fp_coords_copy = data_buf;
-            size_t read_offset = node_offset;
-            flash_decode_vector<T>(_compressed_coord_cache.data() + read_offset, this->_data_dim, this->_aligned_dim, node_fp_coords_copy);
+            decode_cache_vector(node_id, node_fp_coords_copy, stats);
             cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
         }
         else
@@ -1993,8 +2130,7 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         if (!_use_disk_index_pq)
         {
             node_fp_coords_copy = data_buf;
-            size_t read_offset = node_offset;
-            flash_decode_vector<T>(_compressed_coord_cache.data() + read_offset, this->_data_dim, this->_aligned_dim, node_fp_coords_copy);
+            decode_cache_vector(node_id, node_fp_coords_copy, stats);
             cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
         }
         else
@@ -2336,4 +2472,3 @@ template class PQFlashIndex<int8_t, uint16_t>;
 template class PQFlashIndex<float, uint16_t>;
 
 } // namespace diskann
-

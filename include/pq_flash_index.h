@@ -13,6 +13,7 @@
 #include "utils.h"
 #include "windows_customizations.h"
 #include "scratch.h"
+#include "lvc_forest.h"
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
 
@@ -45,6 +46,9 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 #endif
 
     DISKANN_DLLEXPORT void load_cache_list(std::vector<uint32_t> &node_list);
+
+    // 0=ALP (existing default), 1=Raw F32, 2=DeXOR, 3=Gorilla, 4=Elf.
+    DISKANN_DLLEXPORT void set_cache_payload_mode(uint32_t mode, bool verify = false);
 
 #ifdef EXEC_ENV_OLS
     DISKANN_DLLEXPORT void generate_cache_list_from_sample_queries(MemoryMappedFiles &files, std::string sample_bin,
@@ -212,6 +216,12 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     // coord_cache; We now store compressed coordinates in a flat contiguous byte buffer
     std::vector<uint8_t> _compressed_coord_cache;
     tsl::robin_map<uint32_t, size_t> _coord_cache; // maps node id to byte offset
+    uint32_t _cache_payload_mode = 0;
+    bool _verify_cache_payload = false;
+    std::unique_ptr<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>> _dexor_cache;
+    std::unique_ptr<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>> _gorilla_cache;
+    std::unique_ptr<lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>> _elf_cache;
+    void decode_cache_vector(uint32_t node_id, T *output, QueryStats *stats = nullptr) const;
 
     // thread-specific scratch
     ConcurrentQueue<SSDThreadData<T> *> _thread_data;
