@@ -74,6 +74,7 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
     // [New] Simplified pseudo-compression/decompression methods
     void encode_and_store(const data_t *uncompressed_vec, location_t loc);
     void decode_vector(location_t loc, data_t *out_vec) const;
+    template <typename Codec> void decode_lvc_record(location_t loc, data_t *out_vec) const;
 
   private:
     data_t *_data = nullptr;
@@ -81,6 +82,11 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
     // [New] Structures for variable-length compression data
     std::vector<uint8_t> _compressed_data;
     std::vector<size_t> _vector_offsets;
+    // 0: legacy ALP; 1: raw F32; 2/3/4: DeXOR/Gorilla/Elf.
+    uint32_t _lvc_mode = 0;
+    std::vector<uint32_t> _lvc_parent;
+    std::vector<uint8_t> _lvc_depth;
+    std::vector<uint64_t> _lvc_lengths;
 
     size_t _aligned_dim;
 

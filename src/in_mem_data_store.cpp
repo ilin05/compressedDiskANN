@@ -1,14 +1,48 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#include <algorithm>
 #include <memory>
+#include <type_traits>
 #include "abstract_scratch.h"
 #include "in_mem_data_store.h"
+#include "lvc_vamana_file.h"
 
 #include "utils.h"
 
 namespace diskann
 {
+
+template <typename T> struct LvcDecodeScratch
+{
+    T *first = nullptr;
+    T *second = nullptr;
+    size_t capacity = 0;
+
+    ~LvcDecodeScratch()
+    {
+        aligned_free(first);
+        aligned_free(second);
+    }
+
+    void ensure(size_t dim)
+    {
+        if (dim <= capacity) return;
+        aligned_free(first);
+        aligned_free(second);
+        first = second = nullptr;
+        alloc_aligned(reinterpret_cast<void **>(&first), dim * sizeof(T), 32);
+        alloc_aligned(reinterpret_cast<void **>(&second), dim * sizeof(T), 32);
+        capacity = dim;
+    }
+};
+
+template <typename T> LvcDecodeScratch<T> &lvc_decode_scratch()
+{
+    thread_local LvcDecodeScratch<T> scratch;
+    return scratch;
+}
+
 
 struct BitWriter {
     std::vector<uint8_t>& buf;
@@ -142,6 +176,34 @@ void InMemDataStore<data_t>::encode_and_store(const data_t *uncompressed_vec, lo
 template <typename data_t>
 void InMemDataStore<data_t>::decode_vector(location_t loc, data_t *out_vec) const
 {
+    if (_lvc_mode != 0)
+    {
+        if constexpr (!std::is_same_v<data_t, float>)
+        {
+            throw std::runtime_error("LVC Vamana payload requires F32");
+        }
+        else
+        {
+            if (_lvc_mode == 1)
+            {
+                const size_t offset = size_t(loc) * this->_dim * sizeof(float);
+                if (loc >= this->capacity() || offset > _compressed_data.size() ||
+                    this->_dim * sizeof(float) > _compressed_data.size() - offset)
+                    throw std::runtime_error("Raw LVC vector out of bounds");
+                std::memcpy(out_vec, _compressed_data.data() + offset, this->_dim * sizeof(float));
+            }
+            else if (_lvc_mode == 2)
+                decode_lvc_record<hnswlib::codecs::DeXORCodecPolicy>(loc, out_vec);
+            else if (_lvc_mode == 3)
+                decode_lvc_record<hnswlib::codecs::GorillaCodecPolicy>(loc, out_vec);
+            else if (_lvc_mode == 4)
+                decode_lvc_record<hnswlib::codecs::ElfCodecPolicy>(loc, out_vec);
+            else
+                throw std::runtime_error("Unknown LVC codec");
+            std::fill(out_vec + this->_dim, out_vec + _aligned_dim, data_t{});
+            return;
+        }
+    }
     size_t offset = _vector_offsets[loc];
     const uint8_t* compressed_ptr = &_compressed_data[offset];
     BitReader reader(compressed_ptr);
@@ -171,6 +233,27 @@ void InMemDataStore<data_t>::decode_vector(location_t loc, data_t *out_vec) cons
         for (size_t i = this->_dim; i < this->_aligned_dim; ++i) {
             out_vec[i] = 0;
         }
+    }
+}
+
+template <typename data_t>
+template <typename Codec>
+void InMemDataStore<data_t>::decode_lvc_record(location_t loc, data_t *out_vec) const
+{
+    if constexpr (std::is_same_v<data_t, float>)
+    {
+        if (loc >= _lvc_parent.size()) throw std::runtime_error("LVC node out of bounds");
+        std::vector<typename Codec::StateType> states(this->_dim);
+        auto decode_one = [&](location_t id, data_t *target) {
+            const size_t offset = _vector_offsets[id];
+            const uint64_t length = _lvc_lengths[id];
+            if (offset > _compressed_data.size() || length > _compressed_data.size() - offset)
+                throw std::runtime_error("LVC record out of bounds");
+            lvc::decode_record<Codec>(_compressed_data.data() + offset, length, states, target);
+        };
+        const uint32_t root = _lvc_parent[loc];
+        if (root != lvc::no_parent) decode_one(root, nullptr);
+        decode_one(loc, out_vec);
     }
 }
 
@@ -263,6 +346,57 @@ template <typename data_t> location_t InMemDataStore<data_t>::load_impl(const st
         this->resize((location_t)file_num_points);
     }
 
+    uint64_t magic = 0;
+    reader.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+    if (magic == lvc::vamana_magic)
+    {
+        uint32_t version = 0;
+        reader.read(reinterpret_cast<char *>(&version), sizeof(version));
+        reader.read(reinterpret_cast<char *>(&_lvc_mode), sizeof(_lvc_mode));
+        if (version != lvc::vamana_version || _lvc_mode < 1 || _lvc_mode > 4 ||
+            !std::is_same_v<data_t, float>)
+            throw std::runtime_error("Unsupported LVC Vamana data format");
+        if (_lvc_mode != 1)
+        {
+            _lvc_parent.resize(file_num_points);
+            _lvc_depth.resize(file_num_points);
+            reader.read(reinterpret_cast<char *>(_lvc_parent.data()), file_num_points * sizeof(uint32_t));
+            reader.read(reinterpret_cast<char *>(_lvc_depth.data()), file_num_points);
+            std::vector<uint64_t> offsets(file_num_points);
+            _lvc_lengths.resize(file_num_points);
+            reader.read(reinterpret_cast<char *>(offsets.data()), file_num_points * sizeof(uint64_t));
+            reader.read(reinterpret_cast<char *>(_lvc_lengths.data()), file_num_points * sizeof(uint64_t));
+            _vector_offsets.assign(offsets.begin(), offsets.end());
+            lvc::Forest forest;
+            forest.parent = _lvc_parent;
+            forest.depth = _lvc_depth;
+            forest.initial_roots = static_cast<uint32_t>(std::count(_lvc_parent.begin(), _lvc_parent.end(), lvc::no_parent));
+            lvc::validate_forest(forest);
+        }
+        uint64_t payload_size = 0;
+        reader.read(reinterpret_cast<char *>(&payload_size), sizeof(payload_size));
+        const auto payload_begin = reader.tellg();
+        reader.seekg(0, std::ios::end);
+        const auto payload_end = reader.tellg();
+        if (payload_begin == std::streampos(-1) || payload_end == std::streampos(-1) ||
+            payload_end < payload_begin ||
+            uint64_t(payload_end - payload_begin) != payload_size)
+            throw std::runtime_error("Invalid LVC payload file length");
+        reader.seekg(payload_begin);
+        if (_lvc_mode == 1 && payload_size != uint64_t(file_num_points) * this->_dim * sizeof(float))
+            throw std::runtime_error("Invalid raw LVC payload length");
+        _compressed_data.resize(payload_size);
+        reader.read(reinterpret_cast<char *>(_compressed_data.data()), payload_size);
+        if (!reader) throw std::runtime_error("Truncated LVC Vamana data file");
+        if (_lvc_mode != 1)
+            for (size_t i = 0; i < file_num_points; ++i)
+                if (_vector_offsets[i] > payload_size || _lvc_lengths[i] < 8 ||
+                    _lvc_lengths[i] > payload_size - _vector_offsets[i])
+                    throw std::runtime_error("Invalid LVC record boundary");
+        return (location_t)file_num_points;
+    }
+    reader.seekg(2 * sizeof(uint32_t), std::ios::beg);
+    _lvc_mode = 0;
     size_t num_offsets;
     reader.read((char*)&num_offsets, sizeof(size_t));
     _vector_offsets.resize(num_offsets);
@@ -293,6 +427,25 @@ template <typename data_t> size_t InMemDataStore<data_t>::save(const std::string
     writer.write((char*)&npts, sizeof(uint32_t));
     writer.write((char*)&dim_dummy, sizeof(uint32_t));
 
+    if (_lvc_mode != 0)
+    {
+        writer.write(reinterpret_cast<const char *>(&lvc::vamana_magic), sizeof(lvc::vamana_magic));
+        writer.write(reinterpret_cast<const char *>(&lvc::vamana_version), sizeof(lvc::vamana_version));
+        writer.write(reinterpret_cast<const char *>(&_lvc_mode), sizeof(_lvc_mode));
+        if (_lvc_mode != 1)
+        {
+            writer.write(reinterpret_cast<const char *>(_lvc_parent.data()), num_points * sizeof(uint32_t));
+            writer.write(reinterpret_cast<const char *>(_lvc_depth.data()), num_points);
+            std::vector<uint64_t> offsets(_vector_offsets.begin(), _vector_offsets.begin() + num_points);
+            writer.write(reinterpret_cast<const char *>(offsets.data()), num_points * sizeof(uint64_t));
+            writer.write(reinterpret_cast<const char *>(_lvc_lengths.data()), num_points * sizeof(uint64_t));
+        }
+        const uint64_t payload_size = _compressed_data.size();
+        writer.write(reinterpret_cast<const char *>(&payload_size), sizeof(payload_size));
+        writer.write(reinterpret_cast<const char *>(_compressed_data.data()), payload_size);
+        return num_points;
+    }
+
     // offsets table
     size_t num_offsets = _vector_offsets.size();
     writer.write((char*)&num_offsets, sizeof(size_t));
@@ -313,6 +466,7 @@ template <typename data_t> size_t InMemDataStore<data_t>::save(const std::string
 
 template <typename data_t> void InMemDataStore<data_t>::populate_data(const data_t *vectors, const location_t num_pts)
 {
+    _lvc_mode = 0;
     // Instead of copying to _data directly, encode each vector
     _compressed_data.clear();
     _vector_offsets.clear();
@@ -327,6 +481,7 @@ template <typename data_t> void InMemDataStore<data_t>::populate_data(const data
 
 template <typename data_t> void InMemDataStore<data_t>::populate_data(const std::string &filename, const size_t offset)
 {
+    _lvc_mode = 0;
     size_t npts, ndim;
     
     // Check first to allocate properly instead of massive copy
@@ -405,6 +560,7 @@ template <typename data_t> void InMemDataStore<data_t>::get_vector(const locatio
 
 template <typename data_t> void InMemDataStore<data_t>::set_vector(const location_t loc, const data_t *const vector)
 {
+    if (_lvc_mode != 0) throw std::runtime_error("D2 LVC Vamana supports static payloads only");
     // Need to handle resizing dynamically or preallocate in a real impl. Not strictly required for purely static build
     std::vector<data_t> aligned_vec(this->_aligned_dim, 0);
     memcpy(aligned_vec.data(), vector, this->_dim * sizeof(data_t));
@@ -413,6 +569,13 @@ template <typename data_t> void InMemDataStore<data_t>::set_vector(const locatio
 
 template <typename data_t> void InMemDataStore<data_t>::prefetch_vector(const location_t loc)
 {
+    if (_lvc_mode == 1)
+    {
+        const size_t offset = size_t(loc) * this->_dim * sizeof(data_t);
+        if (offset < _compressed_data.size())
+            diskann::prefetch_vector((const char *)(_compressed_data.data() + offset), this->_dim * sizeof(data_t));
+        return;
+    }
     if (loc < _vector_offsets.size()) {
         size_t offset = _vector_offsets[loc];
         // Prefetch the compressed data rather than raw block
@@ -438,6 +601,13 @@ void InMemDataStore<data_t>::preprocess_query(const data_t *query, AbstractScrat
 
 template <typename data_t> float InMemDataStore<data_t>::get_distance(const data_t *query, const location_t loc) const
 {
+    if (_lvc_mode != 0)
+    {
+        auto &scratch = lvc_decode_scratch<data_t>();
+        scratch.ensure(_aligned_dim);
+        decode_vector(loc, scratch.first);
+        return _distance_fn->compare(query, scratch.first, (uint32_t)_aligned_dim);
+    }
     // WARNING: dynamically allocating buffer per distance calc is slow. Kept for minimal architecture validation
     // Future performance patches would place temp_dec on AbstractScratch.
     std::vector<data_t> temp_dec(this->_aligned_dim);
@@ -450,6 +620,17 @@ void InMemDataStore<data_t>::get_distance(const data_t *query, const location_t 
                                           const uint32_t location_count, float *distances,
                                           AbstractScratch<data_t> *scratch_space) const
 {
+    if (_lvc_mode != 0)
+    {
+        auto &local = lvc_decode_scratch<data_t>();
+        local.ensure(_aligned_dim);
+        for (location_t i = 0; i < location_count; ++i)
+        {
+            decode_vector(locations[i], local.first);
+            distances[i] = _distance_fn->compare(query, local.first, (uint32_t)_aligned_dim);
+        }
+        return;
+    }
     std::vector<data_t> temp_dec(this->_aligned_dim);
     for (location_t i = 0; i < location_count; i++)
     {
@@ -461,6 +642,14 @@ void InMemDataStore<data_t>::get_distance(const data_t *query, const location_t 
 template <typename data_t>
 float InMemDataStore<data_t>::get_distance(const location_t loc1, const location_t loc2) const
 {
+    if (_lvc_mode != 0)
+    {
+        auto &scratch = lvc_decode_scratch<data_t>();
+        scratch.ensure(_aligned_dim);
+        decode_vector(loc1, scratch.first);
+        decode_vector(loc2, scratch.second);
+        return _distance_fn->compare(scratch.first, scratch.second, (uint32_t)_aligned_dim);
+    }
     std::vector<data_t> temp_dec1(this->_aligned_dim);
     std::vector<data_t> temp_dec2(this->_aligned_dim);
     decode_vector(loc1, temp_dec1.data());
@@ -472,6 +661,17 @@ template <typename data_t>
 void InMemDataStore<data_t>::get_distance(const data_t *preprocessed_query, const std::vector<location_t> &ids,
                                           std::vector<float> &distances, AbstractScratch<data_t> *scratch_space) const
 {
+    if (_lvc_mode != 0)
+    {
+        auto &local = lvc_decode_scratch<data_t>();
+        local.ensure(_aligned_dim);
+        for (size_t i = 0; i < ids.size(); ++i)
+        {
+            decode_vector(ids[i], local.first);
+            distances[i] = _distance_fn->compare(preprocessed_query, local.first, (uint32_t)_aligned_dim);
+        }
+        return;
+    }
     std::vector<data_t> temp_dec(this->_aligned_dim);
     for (int i = 0; i < ids.size(); i++)
     {
@@ -521,6 +721,7 @@ template <typename data_t>
 void InMemDataStore<data_t>::move_vectors(const location_t old_location_start, const location_t new_location_start,
                                           const location_t num_locations)
 {
+    if (_lvc_mode != 0) throw std::runtime_error("D2 LVC Vamana supports static payloads only");
     if (num_locations == 0 || old_location_start == new_location_start) return;
     // For pure static tests without dynamically sized rewrites, we can just alter offsets.
     // If elements have actual variable size and are moved around in the compressed buffer, 
@@ -541,6 +742,7 @@ template <typename data_t>
 void InMemDataStore<data_t>::copy_vectors(const location_t from_loc, const location_t to_loc,
                                           const location_t num_points)
 {
+    if (_lvc_mode != 0) throw std::runtime_error("D2 LVC Vamana supports static payloads only");
     assert(from_loc < this->_capacity);
     assert(to_loc < this->_capacity);
     assert(num_points < this->_capacity);
