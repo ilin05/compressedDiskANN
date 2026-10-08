@@ -519,6 +519,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
     }
     diskann::aligned_free(temp_coord_cache_buf);
+    _compressed_coord_cache.shrink_to_fit();
     if (_cache_payload_mode >= 2) {
         Timer build_timer;
         if (cached_ids.size() != num_cached_nodes)
@@ -551,6 +552,9 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector));
             payload_bytes = _elf_cache->bytes.size(); patches = _elf_cache->patches;
         }
+        if (_dexor_cache) _dexor_cache->bytes.shrink_to_fit();
+        if (_gorilla_cache) _gorilla_cache->bytes.shrink_to_fit();
+        if (_elf_cache) _elf_cache->bytes.shrink_to_fit();
         _dexor_state_cache.reset();
         _gorilla_state_cache.reset();
         _elf_state_cache.reset();
@@ -626,6 +630,36 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
     }
     diskann::cout << "..done." << std::endl;
+}
+
+template <typename T, typename LabelT>
+typename PQFlashIndex<T, LabelT>::CacheBudgetStats PQFlashIndex<T, LabelT>::get_cache_budget_stats() const
+{
+    CacheBudgetStats stats;
+    stats.nodes = _coord_cache.size();
+    stats.graph_bytes = stats.nodes * (_max_degree + 1) * sizeof(uint32_t);
+    // A conservative bucket estimate includes the stored value and one
+    // uint32 probe-distance/control word, rounded to a 16-byte bucket.
+    const auto bucket_bytes = [](size_t value_bytes) { return (value_bytes + sizeof(uint32_t) + 15) & ~size_t(15); };
+    stats.graph_lookup_bytes =
+        _nhood_cache.bucket_count() * bucket_bytes(sizeof(typename decltype(_nhood_cache)::value_type)) +
+        _coord_cache.bucket_count() * bucket_bytes(sizeof(typename decltype(_coord_cache)::value_type));
+    stats.graph_bytes += stats.graph_lookup_bytes;
+    if (_cache_payload_mode == 2 && _dexor_cache) {
+        stats.vector_payload_bytes = _dexor_cache->bytes.capacity();
+    } else if (_cache_payload_mode == 3 && _gorilla_cache) {
+        stats.vector_payload_bytes = _gorilla_cache->bytes.capacity();
+    } else if (_cache_payload_mode == 4 && _elf_cache) {
+        stats.vector_payload_bytes = _elf_cache->bytes.capacity();
+    } else {
+        stats.vector_payload_bytes = _compressed_coord_cache.capacity();
+    }
+    if (_cache_payload_mode >= 2) {
+        // RecordStore keeps two uint64 arrays and the predecessor forest keeps
+        // two uint32 arrays. These stay resident for differential decoding.
+        stats.vector_metadata_bytes = stats.nodes * (2 * sizeof(uint64_t) + 2 * sizeof(uint32_t));
+    }
+    return stats;
 }
 
 #ifdef EXEC_ENV_OLS

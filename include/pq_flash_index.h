@@ -47,6 +47,16 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 
     DISKANN_DLLEXPORT void load_cache_list(std::vector<uint32_t> &node_list);
 
+    struct CacheBudgetStats {
+        uint64_t nodes = 0;
+        uint64_t graph_bytes = 0; // adjacency array plus both node lookup tables
+        uint64_t graph_lookup_bytes = 0;
+        uint64_t vector_payload_bytes = 0;
+        uint64_t vector_metadata_bytes = 0;
+        uint64_t total_bytes() const { return graph_bytes + vector_payload_bytes + vector_metadata_bytes; }
+    };
+    DISKANN_DLLEXPORT CacheBudgetStats get_cache_budget_stats() const;
+
     // 0=ALP (existing default), 1=Raw F32, 2=DeXOR, 3=Gorilla, 4=Elf.
     DISKANN_DLLEXPORT void set_cache_payload_mode(uint32_t mode, bool verify = false);
     DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio);

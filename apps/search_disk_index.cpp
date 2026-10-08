@@ -81,7 +81,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const std::vector<uint32_t> &Lvec, const float fail_if_recall_below,
                       const std::vector<std::string> &query_filters, const bool use_reorder_data = false,
                       const uint32_t num_rounds = 1, const uint32_t cache_mode = 0,
-                      const bool verify_cache = false, const float lvc_state_cache_ratio = 0.01f)
+                      const bool verify_cache = false, const float lvc_state_cache_ratio = 0.01f,
+                      const uint64_t cache_budget_bytes = 0, const bool cache_budget_probe_only = false)
 {
     struct SearchCsvRow
     {
@@ -183,6 +184,17 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     //     _pFlashIndex->generate_cache_list_from_sample_queries(warmup_query_file, 15, 6, num_nodes_to_cache,
     //     num_threads, node_list);
     _pFlashIndex->load_cache_list(node_list);
+    const auto cache_stats = _pFlashIndex->get_cache_budget_stats();
+    diskann::cout << "CACHE_BUDGET nodes=" << cache_stats.nodes
+                  << " graph_bytes=" << cache_stats.graph_bytes
+                  << " graph_lookup_bytes=" << cache_stats.graph_lookup_bytes
+                  << " vector_payload_bytes=" << cache_stats.vector_payload_bytes
+                  << " vector_metadata_bytes=" << cache_stats.vector_metadata_bytes
+                  << " total_bytes=" << cache_stats.total_bytes()
+                  << " limit_bytes=" << cache_budget_bytes << std::endl;
+    if (cache_budget_probe_only) return 0;
+    if (cache_budget_bytes && cache_stats.total_bytes() > cache_budget_bytes)
+        throw std::runtime_error("Cache graph plus vector budget exceeded");
     const size_t rss_after_cache_load_kb = get_peak_rss_kb();
     const size_t current_rss_after_cache_load_kb = get_current_rss_kb();
     diskann::cout << "Peak RSS after cache load: " << rss_after_cache_load_kb << " KB" << std::endl;
@@ -482,6 +494,8 @@ int main(int argc, char **argv)
     std::vector<uint32_t> Lvec;
     bool use_reorder_data = false;
     bool verify_cache = false;
+    bool cache_budget_probe_only = false;
+    uint64_t cache_budget_bytes = 0;
     float lvc_state_cache_ratio = 0.01f;
     std::string cache_codec;
     float fail_if_recall_below = 0.0f;
@@ -522,6 +536,10 @@ int main(int argc, char **argv)
                                        "RAM cache payload: alp, raw, dexor, gorilla, elf");
         optional_configs.add_options()("verify_cache", po::bool_switch(&verify_cache),
                                        "Verify every differential cache vector bitwise after construction");
+        optional_configs.add_options()("cache_budget_probe_only", po::bool_switch(&cache_budget_probe_only),
+                                       "Load the cache, report budget bytes, and exit before query search");
+        optional_configs.add_options()("cache_budget_bytes", po::value<uint64_t>(&cache_budget_bytes)->default_value(0),
+                                       "Maximum graph plus full-precision cache bytes, excluding PQ and state cache");
         optional_configs.add_options()("lvc_state_cache_ratio",
                                        po::value<float>(&lvc_state_cache_ratio)->default_value(0.01f),
                                        "Fraction of loaded cache nodes whose LVC root states are cached (0 to 0.01)");
@@ -638,15 +656,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -658,15 +676,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
