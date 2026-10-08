@@ -17,7 +17,7 @@ constexpr uint32_t no_parent = UINT32_MAX;
 
 struct Forest {
     std::vector<uint32_t> parent; // Local node IDs; no_parent marks a root.
-    std::vector<uint8_t> depth;   // 0 for roots, 1 for children.
+    std::vector<uint32_t> depth;  // Number of edges from a root.
     uint32_t initial_roots = 0;
     uint32_t fallback_nodes = 0;
     uint32_t propagation_rounds = 0;
@@ -58,6 +58,8 @@ template <typename Codec> class RootStateCache {
 };
 
 inline void validate_forest(const Forest &forest) {
+    // Every parent must have depth exactly one less than its child; a cycle
+    // would require depth to decrease forever, so this also checks acyclicity.
     const size_t count = forest.parent.size();
     if (count == 0 || forest.depth.size() != count || forest.initial_roots == 0 ||
         forest.initial_roots > count) {
@@ -68,8 +70,9 @@ inline void validate_forest(const Forest &forest) {
         if (forest.parent[i] == no_parent) {
             if (forest.depth[i] != 0) throw std::runtime_error("Invalid root depth");
             ++roots;
-        } else if (forest.parent[i] >= count || forest.parent[i] == i || forest.depth[i] != 1 ||
-                   forest.parent[forest.parent[i]] != no_parent) {
+        } else if (forest.parent[i] >= count || forest.parent[i] == i || forest.depth[i] == 0 ||
+                   forest.depth[i] >= count ||
+                   uint64_t(forest.depth[forest.parent[i]]) + 1 != forest.depth[i]) {
             throw std::runtime_error("Invalid LVC parent or depth");
         }
     }
@@ -79,8 +82,10 @@ inline void validate_forest(const Forest &forest) {
 // Neighbors and vectors use dense local IDs. For a disk cache, callers must
 // filter neighbors to cached nodes and map global IDs to local IDs first.
 template <typename NeighborFn, typename VectorFn>
-Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn vector) {
+Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn vector,
+                    int chain_max = 2) {
     if (count == 0 || dim == 0) throw std::runtime_error("Empty LVC forest input");
+    if (chain_max != -1 && chain_max < 2) throw std::runtime_error("LVC chain_max must be -1 or >= 2");
     Forest forest;
     forest.parent.assign(count, no_parent);
     forest.depth.assign(count, 0);
@@ -114,6 +119,52 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         }
         return sum;
     };
+
+    if (chain_max != 2) {
+        // Match HNSW's deeper-chain policy: assign each unvisited node to its
+        // nearest already assigned graph neighbor, respecting the depth limit.
+        std::vector<uint8_t> visited = is_root;
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            ++forest.propagation_rounds;
+            for (uint32_t i = 0; i < count; ++i) {
+                if (visited[i]) continue;
+                uint32_t best_parent = no_parent;
+                float best = std::numeric_limits<float>::max();
+                for (uint32_t neighbor : neighbors(i)) {
+                    if (neighbor >= count) throw std::runtime_error("LVC neighbor ID out of range");
+                    if (!visited[neighbor] || (chain_max > 0 && forest.depth[neighbor] >= uint32_t(chain_max - 1))) continue;
+                    const float d = distance(i, neighbor);
+                    if (d < best) { best = d; best_parent = neighbor; }
+                }
+                if (best_parent != no_parent) {
+                    forest.parent[i] = best_parent;
+                    forest.depth[i] = forest.depth[best_parent] + 1;
+                    visited[i] = 1;
+                    changed = true;
+                }
+            }
+        }
+        // Match HNSW's fallback: scan already assigned nodes with room in the
+        // chain. A root is always eligible, so root count remains fixed.
+        for (uint32_t i = 0; i < count; ++i) {
+            if (visited[i]) continue;
+            float best = std::numeric_limits<float>::max();
+            for (uint32_t candidate = 0; candidate < count; ++candidate) {
+                if (!visited[candidate] ||
+                    (chain_max > 0 && forest.depth[candidate] >= uint32_t(chain_max - 1))) continue;
+                const float d = distance(i, candidate);
+                if (d < best) { best = d; forest.parent[i] = candidate; }
+            }
+            if (forest.parent[i] == no_parent) throw std::runtime_error("No finite LVC root distance");
+            forest.depth[i] = forest.depth[forest.parent[i]] + 1;
+            visited[i] = 1;
+            ++forest.fallback_nodes;
+        }
+        validate_forest(forest);
+        return forest;
+    }
 
     // HNSW's chain_max_length == 2 propagation: compare the roots already
     // assigned to immediate neighbors, not the neighbors themselves.
@@ -190,16 +241,18 @@ template <typename Codec> class RecordStore {
             store.patches += record.patches;
         };
 
-        for (uint32_t id = 0; id < source.parent.size(); ++id) {
-            if (source.parent[id] == no_parent) {
-                append(id, std::vector<typename Codec::StateType>(dimension));
-            }
-        }
-        for (uint32_t id = 0; id < source.parent.size(); ++id) {
-            const uint32_t root = source.parent[id];
-            if (root == no_parent) continue;
+        std::vector<uint32_t> order(source.parent.size());
+        std::iota(order.begin(), order.end(), 0);
+        std::sort(order.begin(), order.end(), [&](uint32_t a, uint32_t b) {
+            return source.depth[a] != source.depth[b] ? source.depth[a] < source.depth[b] : a < b;
+        });
+        for (uint32_t id : order) {
+            const uint32_t parent = source.parent[id];
             std::vector<typename Codec::StateType> states(dimension);
-            store.decode_one(root, states, nullptr);
+            if (parent != no_parent) {
+                std::vector<float> unused(dimension);
+                store.decode(parent, unused.data(), states);
+            }
             append(id, states);
         }
         return store;
@@ -213,21 +266,24 @@ template <typename Codec> class RecordStore {
     void decode(uint32_t id, float *output, std::vector<typename Codec::StateType> &states,
                 const RootStateCache<Codec> *cache = nullptr, uint64_t *records = nullptr) const {
         if (id >= forest.parent.size() || output == nullptr) throw std::runtime_error("Invalid LVC decode target");
-        const uint32_t root = forest.parent[id];
-        const auto *entry = cache == nullptr ? nullptr : cache->find(root == no_parent ? id : root);
-        if (root == no_parent && entry != nullptr) {
+        std::vector<uint32_t> path;
+        for (uint32_t current = id; current != no_parent; current = forest.parent[current])
+            path.push_back(current);
+        const uint32_t root = path.back();
+        const auto *entry = cache == nullptr ? nullptr : cache->find(root);
+        if (path.size() == 1 && entry != nullptr) {
             states = entry->states;
             std::copy(entry->vector.begin(), entry->vector.end(), output);
             if (records != nullptr) *records = 0;
             return;
         }
-        if (entry != nullptr) states = entry->states;
-        else {
-            states.assign(dim, typename Codec::StateType{});
-            if (root != no_parent) decode_one(root, states, nullptr);
+        states = entry != nullptr ? entry->states : std::vector<typename Codec::StateType>(dim);
+        uint64_t replayed = 0;
+        for (auto it = path.rbegin() + (entry != nullptr ? 1 : 0); it != path.rend(); ++it) {
+            decode_one(*it, states, output);
+            ++replayed;
         }
-        decode_one(id, states, output);
-        if (records != nullptr) *records = 1 + (root != no_parent && entry == nullptr ? 1 : 0);
+        if (records != nullptr) *records = replayed;
     }
 
   private:

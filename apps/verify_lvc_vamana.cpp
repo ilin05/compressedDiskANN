@@ -91,7 +91,9 @@ int main(int argc, char **argv) {
             forest.parent.resize(count);
             forest.depth.resize(count);
             file.read(reinterpret_cast<char *>(forest.parent.data()), count * sizeof(uint32_t));
-            file.read(reinterpret_cast<char *>(forest.depth.data()), count);
+            std::vector<uint8_t> depths(count);
+            file.read(reinterpret_cast<char *>(depths.data()), count);
+            forest.depth.assign(depths.begin(), depths.end());
             forest.initial_roots = std::count(forest.parent.begin(), forest.parent.end(), diskann::lvc::no_parent);
             diskann::lvc::validate_forest(forest);
         }

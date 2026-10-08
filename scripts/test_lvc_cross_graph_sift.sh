@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# SIFT pilot: the same fvecs/ivecs inputs feed HNSW and Vamana.
+# One cross-graph dataset: the same fvecs/ivecs inputs feed HNSW and Vamana.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISKANN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ -z "${HNSW_DIR:-}" ]]; then
@@ -17,12 +17,13 @@ if [[ ! -f "$HNSW_DIR/CMakeLists.txt" ]]; then
 fi
 HNSW_DATA_DIR="${HNSW_DATA_DIR:-$HNSW_DIR/datasets/hdf5files}"
 DATASET="${DATASET:-sift-128-euclidean}"
-OUTPUT_DIR="${OUTPUT_DIR:-$DISKANN_DIR/build/data/sift_cross_graph}"
+OUTPUT_DIR="${OUTPUT_DIR:-$DISKANN_DIR/build/data/cross_graph_${DATASET}}"
 DISKANN_BUILD_DIR="${DISKANN_BUILD_DIR:-$DISKANN_DIR/build}"
 HNSW_BUILD_DIR="${HNSW_BUILD_DIR:-$HNSW_DIR/build_lvc_sift}"
 BUILD_THREADS="${BUILD_THREADS:-4}"
 SEARCH_THREADS="${SEARCH_THREADS:-1}"
 ROUNDS="${ROUNDS:-3}"
+CHAIN_SWEEP="${CHAIN_SWEEP:-2 4 8 -1}"
 CXX="${CXX:-g++}"
 
 for kind in train.fvecs test.fvecs neighbors.ivecs; do
@@ -64,7 +65,19 @@ if shapes['test.fvecs'][0] != shapes['neighbors.ivecs'][0]:
     raise SystemExit('Query/ground-truth counts differ')
 if shapes['neighbors.ivecs'][1] < 10:
     raise SystemExit('Ground truth needs at least 10 neighbors')
-print('SIFT input shapes:', shapes)
+if 'angular' in name:
+    import math
+    for suffix in ('train.fvecs', 'test.fvecs'):
+        path = base / f'{name}_{suffix}'
+        with path.open('rb') as f:
+            dim = shapes[suffix][1]
+            for row in range(min(100, shapes[suffix][0])):
+                f.read(4)
+                values = struct.unpack('<%df' % dim, f.read(4 * dim))
+                norm = math.sqrt(sum(x*x for x in values))
+                if abs(norm - 1.0) > 1e-3:
+                    raise SystemExit(f'Angular input is not unit-normalized: {path} row={row} norm={norm}')
+print('Cross-graph input shapes:', shapes)
 PY
 
 if [[ ! -f "$DISKANN_BUILD_DIR/CMakeCache.txt" ]]; then
@@ -80,7 +93,7 @@ cmake --build "$HNSW_BUILD_DIR" \
   --target test_build_compressed_hnsw_ablation test_search_compressed_hnsw_ablation \
   --parallel "$BUILD_THREADS"
 
-echo "Converting SIFT inputs to DiskANN bin format"
+echo "Converting cross-graph inputs to DiskANN bin format"
 train="$OUTPUT_DIR/${DATASET}_train.fbin"
 query="$OUTPUT_DIR/${DATASET}_test.fbin"
 gt="$OUTPUT_DIR/${DATASET}_neighbors.bin"
@@ -107,21 +120,21 @@ for suffix, target in zip(('train.fvecs', 'test.fvecs', 'neighbors.ivecs'), map(
     print(f'Converted {suffix}: n={n} dim={d} bytes={target.stat().st_size}')
 PY
 
-# HNSW ablation uses F64 vectors, M=16, efConstruction=200, 1% roots by level,
-# chain_max=2, 1% decoding cache, and TLS ratio 0.2.
+# Both paths use the same F32 source values and 1% highest-degree roots.
+# HNSW stores those exact F32 values in F64 slots; ratios below use F32 bytes.
 echo "Building and searching HNSW indexes"
 (
   cd "$OUTPUT_DIR"
   "$HNSW_BUILD_DIR/test_build_compressed_hnsw_ablation" \
     --base_dir "$HNSW_DATA_DIR" --dataset "$DATASET" \
-    --algorithm DeXOR Gorilla Elf --chain_max 2 --threads "$BUILD_THREADS" \
+    --algorithm DeXOR Gorilla Elf --chain_max $CHAIN_SWEEP --root_policy degree --f32_lossless --reuse_graph --threads "$BUILD_THREADS" \
     --M 16 --ef_construction 200 --output_csv hnsw_build.csv \
     > hnsw_build.log 2>&1
   for k in 1 10; do
     "$HNSW_BUILD_DIR/test_search_compressed_hnsw_ablation" \
       --base_dir "$HNSW_DATA_DIR" --dataset "$DATASET" \
-      --algorithm DeXOR Gorilla Elf --chain_max 2 --threads "$SEARCH_THREADS" \
-      --k "$k" --ef 20 50 100 --use_cache 1 --use_tls 1 --tls_ratio 0.2 \
+      --algorithm DeXOR Gorilla Elf --chain_max 2 --root_policy degree --threads "$SEARCH_THREADS" \
+      --k "$k" --ef 20 50 100 --use_cache 1 --use_tls 0 1 --tls_ratio 0.2 \
       --num_rounds "$ROUNDS" --output_csv "hnsw_search_k${k}.csv" \
       > "hnsw_search_k${k}.log" 2>&1
   done
@@ -149,20 +162,28 @@ prefix="$OUTPUT_DIR/vamana_lvc"
 echo "Compressing and searching Vamana indexes"
 "$DISKANN_BUILD_DIR/apps/convert_lvc_vamana" "$graph" "$train" "$prefix" \
   | tee "$OUTPUT_DIR/vamana_compression.log"
+for chain in $CHAIN_SWEEP; do
+  [[ "$chain" == 2 ]] && continue
+  "$DISKANN_BUILD_DIR/apps/convert_lvc_vamana" "$graph" "$train" "${prefix}_ch${chain}" \
+    --chain_max "$chain" --compression_only \
+    > "$OUTPUT_DIR/vamana_compression_ch${chain}.log"
+done
 for codec in raw dexor gorilla elf; do
   "$DISKANN_BUILD_DIR/apps/verify_lvc_vamana" "$train" "${prefix}_${codec}.data" \
     > "$OUTPUT_DIR/vamana_verify_${codec}.log" 2>&1
   for k in 1 10; do
+    for tls in 0 1; do
     "$DISKANN_BUILD_DIR/apps/search_memory_index" \
       --data_type float --dist_fn l2 --index_path_prefix "${prefix}_${codec}" \
       --query_file "$query" --gt_file "$gt" \
       -K "$k" -L 20 50 100 -T "$SEARCH_THREADS" -R "$ROUNDS" \
-      --use_pq_dist 1 --pq_bytes 16 --pq_prefix "$train" \
+      --use_pq_dist "$tls" --pq_bytes 16 --pq_prefix "$train" \
       --pq_exact_rerank_ratio 0.2 --lvc_state_cache_ratio 0.01 \
-      --result_path "$OUTPUT_DIR/vamana_${codec}_k${k}" \
-      > "$OUTPUT_DIR/vamana_${codec}_k${k}.log" 2>&1
+      --result_path "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}" \
+      > "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}.log" 2>&1
     cp "${prefix}_${codec}_K${k}_T${SEARCH_THREADS}_search_result.csv" \
-      "$OUTPUT_DIR/vamana_${codec}_k${k}.csv"
+      "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}.csv"
+    done
   done
 done
 
@@ -170,20 +191,21 @@ python3 - "$OUTPUT_DIR" <<'PY'
 import csv, pathlib, re, sys
 out = pathlib.Path(sys.argv[1])
 for k in (1, 10):
+  for tls in (0, 1):
     for L in (20, 50, 100):
         for kind in ('idx_uint32.bin', 'dists_float.bin'):
-            raw = (out / f'vamana_raw_k{k}_{L}_{kind}').read_bytes()
+            raw = (out / f'vamana_raw_k{k}_tls{tls}_{L}_{kind}').read_bytes()
             for codec in ('dexor', 'gorilla', 'elf'):
-                candidate = (out / f'vamana_{codec}_k{k}_{L}_{kind}').read_bytes()
+                candidate = (out / f'vamana_{codec}_k{k}_tls{tls}_{L}_{kind}').read_bytes()
                 if candidate != raw:
                     first = next((i for i, pair in enumerate(zip(candidate, raw))
                                   if pair[0] != pair[1]), min(len(candidate), len(raw)))
                     raise SystemExit(f'FAIL Vamana {codec} K={k} L={L} {kind} byte={first}')
 print('PASS Vamana: all codec IDs and L2 bits match raw for every K/L')
-print('\nHNSW compression (baseline: F64):')
+print('\nHNSW compression (common F32 baseline):')
 for row in csv.DictReader((out / 'hnsw_build.csv').open()):
-    print(row['Algorithm'], 'data_ratio=', row['DataCompressionRatio'],
-          'index_ratio=', row['IndexCompressionRatio'],
+    print(row['Algorithm'], 'chain=', row['ChainMaxLength'], 'data_ratio_f32=', row['PayloadRatioF32'],
+          'index_ratio_f32=', row['FullIndexRatioF32'],
           'build_s=', row['BuildTime(s)'], 'compress_s=', row['CompressTime(s)'])
 print('\nVamana compression (baseline: F32):')
 for line in (out / 'vamana_compression.log').read_text().splitlines():
@@ -192,21 +214,22 @@ for line in (out / 'vamana_compression.log').read_text().splitlines():
 rows = []
 for k in (1, 10):
     for row in csv.DictReader((out / f'hnsw_search_k{k}.csv').open()):
-        rows.append(dict(graph='HNSW', codec=row['Algorithm'], k=k,
+        rows.append(dict(graph='HNSW', codec=row['Algorithm'], k=k, tls=row['UseTwoLevelSearch'],
                          search_width=row['ef'], recall=row['Recall'], qps=row['QPS'],
                          mean_us=row['TimePerQuery(us)'], p99_us=row['P99_Latency(us)'],
                          metric='p99'))
     for codec in ('raw', 'dexor', 'gorilla', 'elf'):
-        for row in csv.DictReader((out / f'vamana_{codec}_k{k}.csv').open()):
-            rows.append(dict(graph='Vamana', codec=codec, k=k,
+      for tls in (0, 1):
+        for row in csv.DictReader((out / f'vamana_{codec}_k{k}_tls{tls}.csv').open()):
+            rows.append(dict(graph='Vamana', codec=codec, k=k, tls=tls,
                              search_width=row['Ls'], recall=row[f'Recall@{k}'],
                              qps=row['QPS'], mean_us=row['Mean Latency (mus)'],
                              p99_us=row['99.9 Latency'], metric='p999'))
 with (out / 'pilot_search_summary.csv').open('w', newline='') as f:
-    writer = csv.DictWriter(f, fieldnames=('graph', 'codec', 'k', 'search_width',
+    writer = csv.DictWriter(f, fieldnames=('graph', 'codec', 'k', 'tls', 'search_width',
                                            'recall', 'qps', 'mean_us', 'p99_us', 'metric'))
     writer.writeheader()
     writer.writerows(rows)
 print(f'Wrote {len(rows)} retrieval rows to {out / "pilot_search_summary.csv"}')
 PY
-echo "SIFT pilot results: $OUTPUT_DIR"
+echo "Cross-graph results: $OUTPUT_DIR"

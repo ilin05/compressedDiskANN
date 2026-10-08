@@ -426,7 +426,7 @@ template <typename data_t> location_t InMemDataStore<data_t>::load_impl(const st
             _vector_offsets.assign(offsets.begin(), offsets.end());
             lvc::Forest forest;
             forest.parent = _lvc_parent;
-            forest.depth = _lvc_depth;
+            forest.depth.assign(_lvc_depth.begin(), _lvc_depth.end());
             forest.initial_roots = static_cast<uint32_t>(std::count(_lvc_parent.begin(), _lvc_parent.end(), lvc::no_parent));
             lvc::validate_forest(forest);
         }
