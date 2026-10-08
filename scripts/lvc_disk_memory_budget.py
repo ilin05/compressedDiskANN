@@ -5,8 +5,8 @@ The budget includes adjacency storage, estimated node lookup buckets, resident
 vector payload and differential record metadata. PQ, decoding state cache,
 queries, search scratch and temporary construction buffers are excluded.
 The search log and summary preserve RSS so physical memory can be audited.
-The selector brackets and bisects the byte threshold, then probes the adjacent
-node count. This treats cache bytes as monotone in node count near the boundary.
+The selector brackets and bisects the byte threshold, then probes down to the
+requested node granularity. This treats cache bytes as monotone near the boundary.
 """
 
 import argparse
@@ -33,7 +33,16 @@ def main():
     parser.add_argument("--gt", type=pathlib.Path, required=True)
     parser.add_argument("--output-dir", type=pathlib.Path, required=True)
     parser.add_argument("--budget-mib", type=float, default=32)
+    parser.add_argument("--expected-points", type=int)
+    parser.add_argument("--expected-pq-bytes", type=int)
     parser.add_argument("--pilot-nodes", type=int, default=8192)
+    parser.add_argument("--pilot-summary", type=pathlib.Path,
+                        help="Prior smaller-scale summary.csv used to seed per-codec node counts")
+    parser.add_argument("--pilot-summary-points", type=int, default=1000000)
+    parser.add_argument("--node-granularity", type=int, default=1,
+                        help="Stop bisection when the feasible/infeasible node gap is at most this size")
+    parser.add_argument("--resume-probes", action="store_true",
+                        help="Reuse completed probe logs for the same binary, index and budget")
     parser.add_argument("--max-probes", type=int, default=32)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--k", type=int, default=1)
@@ -44,15 +53,32 @@ def main():
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     budget = int(args.budget_mib * 1024 * 1024)
-    if budget <= 0 or args.pilot_nodes <= 0 or args.max_probes <= 0 or args.rounds <= 0:
-        parser.error("budget, pilot-nodes, max-probes, and rounds must be positive")
+    if (budget <= 0 or args.pilot_nodes <= 0 or args.max_probes <= 0 or
+            args.rounds <= 0 or args.node_granularity <= 0 or args.pilot_summary_points <= 0):
+        parser.error("budget, pilot-nodes, max-probes, rounds, and node granularity must be positive")
     if not args.L_values or any(value < args.k for value in args.L_values):
         parser.error("every L must be at least K")
     pq_path = pathlib.Path(str(args.index_prefix) + "_pq_compressed.bin")
+    disk_path = pathlib.Path(str(args.index_prefix) + "_disk.index")
     pq_file_bytes = pq_path.stat().st_size
     with pq_path.open("rb") as f:
         points, pq_bytes = struct.unpack("<II", f.read(8))
+    if pq_file_bytes != 8 + points * pq_bytes:
+        parser.error(f"PQ file size {pq_file_bytes} does not match {points} x {pq_bytes} codes")
+    if args.expected_points is not None and points != args.expected_points:
+        parser.error(f"PQ file has {points} points; expected {args.expected_points}")
+    if args.expected_pq_bytes is not None and pq_bytes != args.expected_pq_bytes:
+        parser.error(f"PQ file has {pq_bytes} bytes per vector; expected {args.expected_pq_bytes}")
     max_nodes = max(1, round(points * 0.5))  # cache_bfs_levels has the same cap
+    pilot_counts = {}
+    if args.pilot_summary:
+        with args.pilot_summary.open(newline="") as f:
+            for row in csv.DictReader(f):
+                if row.get("phase") == "check" and row.get("codec") in CODECS:
+                    pilot_counts[row["codec"]] = min(max_nodes, max(1,
+                        round(int(row["nodes"]) * points / args.pilot_summary_points)))
+        if set(pilot_counts) != set(CODECS):
+            parser.error("pilot-summary must contain check rows for raw, alp, dexor, gorilla, elf")
     print(f"points={points} pq_bytes_per_vector={pq_bytes} pq_file_bytes={pq_file_bytes} "
           f"non_pq_budget_bytes={budget}", flush=True)
 
@@ -70,16 +96,30 @@ def main():
             command.append("--cache_budget_probe_only")
         elif codec in ("dexor", "gorilla", "elf") and phase == "check":
             command.append("--verify_cache")
-        completed = subprocess.run(command, text=True, stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT)
         log = args.output_dir / f"{codec}_{phase}.log"
-        log.write_text(completed.stdout)
-        match = BUDGET_RE.search(completed.stdout)
-        if completed.returncode or match is None:
+        marker = args.output_dir / f"{codec}_{phase}.ok"
+        stamp = (f"{args.binary.resolve()}:{args.binary.stat().st_mtime_ns}:"
+                 f"{args.index_prefix.resolve()}:{pq_path.stat().st_mtime_ns}:"
+                 f"{disk_path.stat().st_mtime_ns}:"
+                 f"{codec}:{nodes}:{budget}\n")
+        if probe and args.resume_probes and log.exists() and marker.exists() and marker.read_text() == stamp:
+            output, returncode = log.read_text(), 0
+            print(f"Reusing {log}", flush=True)
+        else:
+            if probe:
+                marker.unlink(missing_ok=True)
+            completed = subprocess.run(command, text=True, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT)
+            output, returncode = completed.stdout, completed.returncode
+            log.write_text(output)
+        match = BUDGET_RE.search(output)
+        if returncode or match is None:
             raise RuntimeError(f"{codec} {phase} failed; see {log}")
         graph, lookup, payload, metadata, total = map(int, match.groups()[1:6])
         if graph + payload + metadata != total or int(match.group(1)) != nodes:
             raise RuntimeError(f"Inconsistent budget accounting in {log}")
+        if probe and not marker.exists():
+            marker.write_text(stamp)
         stats = dict(nodes=nodes, graph_bytes=graph, graph_lookup_bytes=lookup,
                      vector_payload_bytes=payload,
                      vector_metadata_bytes=metadata, total_bytes=total)
@@ -93,7 +133,7 @@ def main():
                                 ("peak_rss_after_search_kib", "RSS_After_Search(KB)"),
                                 ("current_rss_after_search_kib", "Current_RSS_After_Search(KB)")):
                 stats[key] = result.get(column, "")
-            state = re.search(r"state_cache_payload_bytes=(\d+)", completed.stdout)
+            state = re.search(r"state_cache_payload_bytes=(\d+)", output)
             stats["state_cache_payload_bytes"] = int(state.group(1)) if state else 0
         return stats
 
@@ -105,14 +145,14 @@ def main():
             if nodes not in probes:
                 if len(probes) >= args.max_probes:
                     raise RuntimeError(f"{codec}: max-probes exhausted before adjacent budget boundary")
-                stats = run(codec, nodes, f"probe_{len(probes)}", probe=True)
+                stats = run(codec, nodes, f"probe_{nodes}", probe=True)
                 probes[nodes] = stats
                 print(f"{codec} probe={len(probes) - 1} nodes={nodes} "
                       f"bytes={stats['total_bytes']} utilization={stats['total_bytes'] / budget:.3f}",
                       flush=True)
             return probes[nodes]
 
-        pilot = min(args.pilot_nodes, max_nodes)
+        pilot = pilot_counts.get(codec, min(args.pilot_nodes, max_nodes))
         first = measure(pilot)
         if first["total_bytes"] <= budget:
             low, low_stats = pilot, first
@@ -143,7 +183,7 @@ def main():
                 candidate = max(1, min(candidate - 1,
                     int(candidate * budget / current["total_bytes"] * 0.95)))
 
-        while high is not None and high - low > 1:
+        while high is not None and high - low > args.node_granularity:
             mid = low + (high - low) // 2
             current = measure(mid)
             if current["total_bytes"] <= budget:
@@ -151,7 +191,7 @@ def main():
             else:
                 high = mid
         selected[codec] = low_stats
-        boundary = "index cap" if high is None else f"node {high} exceeds budget"
+        boundary = "index cap" if high is None else f"node {high} exceeds budget; gap={high - low}"
         print(f"SELECT {codec}: nodes={low} budget_bytes={low_stats['total_bytes']} "
               f"utilization={low_stats['total_bytes'] / budget:.3f}; {boundary}", flush=True)
 
@@ -169,6 +209,7 @@ def main():
                 recall_key = f"Recall@{args.k}"
                 rows.append(dict(codec=codec, phase=phase, k=args.k, L=int(result["L"]),
                                  beamwidth=width, rounds=args.rounds, budget_bytes=budget,
+                                 node_granularity=args.node_granularity,
                                  pq_file_bytes=pq_file_bytes,
                                  budget_utilization=measured["total_bytes"] / budget,
                                  **{key: value for key, value in measured.items()
