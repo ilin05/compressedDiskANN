@@ -24,7 +24,6 @@ BUILD_THREADS="${BUILD_THREADS:-4}"
 SEARCH_THREADS="${SEARCH_THREADS:-1}"
 ROUNDS="${ROUNDS:-3}"
 CHAIN_SWEEP="2 4 8 -1"
-CXX="${CXX:-g++}"
 
 for kind in train.fvecs test.fvecs neighbors.ivecs; do
   file="$HNSW_DATA_DIR/${DATASET}_$kind"
@@ -127,6 +126,7 @@ if [[ ! -f "$DISKANN_BUILD_DIR/CMakeCache.txt" ]]; then
 fi
 cmake --build "$DISKANN_BUILD_DIR" \
   --target fvecs_to_bin ivecs_to_bin build_memory_index search_memory_index \
+           convert_lvc_vamana verify_lvc_vamana \
   --parallel "$BUILD_THREADS"
 if [[ ! -f "$HNSW_BUILD_DIR/CMakeCache.txt" ]]; then
   cmake -S "$HNSW_DIR" -B "$HNSW_BUILD_DIR" -DHNSWLIB_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
@@ -194,12 +194,6 @@ for suffix in "pq${PQ_BYTES}_pivots.bin" "pq${PQ_BYTES}_compressed.bin"; do
   [[ -s "${train}${suffix}" ]] || { echo "Missing PQ file: ${train}${suffix}" >&2; exit 1; }
 done
 
-for app in convert_lvc_vamana verify_lvc_vamana; do
-  "$CXX" -std=c++17 -O2 -I "$DISKANN_DIR/include" \
-    "$DISKANN_DIR/apps/$app.cpp" \
-    "$DISKANN_DIR/include/lvc_codec/encoding_algorithms/elf/elf64_utils.cpp" \
-    -o "$DISKANN_BUILD_DIR/apps/$app"
-done
 prefix="$OUTPUT_DIR/vamana_lvc"
 echo "Compressing and searching Vamana indexes"
 "$DISKANN_BUILD_DIR/apps/convert_lvc_vamana" "$graph" "$train" "$prefix" \
