@@ -19,6 +19,6 @@ python3 "$SCRIPT_DIR/lvc_disk_memory_budget.py" \
   --binary "$BUILD_DIR/apps/search_disk_index" \
   --index-prefix "$INDEX_PREFIX" --query "$QUERY_FILE" --gt "$GT_FILE" \
   --output-dir "$OUTPUT_DIR" --budget-mib "$BUDGET_MIB" \
-  --threads "${THREADS:-1}" --k "${K:-10}" --L "${L:-50}" \
+  --threads "${THREADS:-1}" --k 1 --L 1 2 3 4 5 6 8 10 --rounds 10 \
   --performance-beamwidth "${PERF_W:-2}" \
-  --pilot-nodes "${PILOT_NODES:-8192}" --max-probes "${MAX_PROBES:-8}"
+  --pilot-nodes "${PILOT_NODES:-8192}" --max-probes "${MAX_PROBES:-32}"
