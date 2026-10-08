@@ -1,0 +1,2 @@
+L,Beamwidth,Num_Nodes_To_Cache,RSS_After_Cache_Load(KB),RSS_After_Search(KB),Current_RSS_After_Cache_Load(KB),Current_RSS_After_Search(KB),QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@10
+50,2,37814,185472,185472,186508,186644,348.172324,2814.341900,4674.000000,51.257400,2439.637200,207.131900,99.999000
