@@ -23,13 +23,13 @@ HNSW_BUILD_DIR="${HNSW_BUILD_DIR:-$HNSW_DIR/build_lvc_sift}"
 BUILD_THREADS="${BUILD_THREADS:-4}"
 SEARCH_THREADS="${SEARCH_THREADS:-1}"
 ROUNDS="${ROUNDS:-3}"
-CHAIN_SWEEP="${CHAIN_SWEEP:-2 4 8 -1}"
+CHAIN_SWEEP="2 4 8 -1"
 CXX="${CXX:-g++}"
 
 for kind in train.fvecs test.fvecs neighbors.ivecs; do
   file="$HNSW_DATA_DIR/${DATASET}_$kind"
   if [[ ! -f "$file" ]]; then
-    echo "Missing SIFT input: $file" >&2
+    echo "Missing cross-graph input: $file" >&2
     exit 1
   fi
 done
@@ -65,19 +65,61 @@ if shapes['test.fvecs'][0] != shapes['neighbors.ivecs'][0]:
     raise SystemExit('Query/ground-truth counts differ')
 if shapes['neighbors.ivecs'][1] < 10:
     raise SystemExit('Ground truth needs at least 10 neighbors')
-if 'angular' in name:
-    import math
-    for suffix in ('train.fvecs', 'test.fvecs'):
-        path = base / f'{name}_{suffix}'
-        with path.open('rb') as f:
-            dim = shapes[suffix][1]
-            for row in range(min(100, shapes[suffix][0])):
-                f.read(4)
-                values = struct.unpack('<%df' % dim, f.read(4 * dim))
-                norm = math.sqrt(sum(x*x for x in values))
-                if abs(norm - 1.0) > 1e-3:
-                    raise SystemExit(f'Angular input is not unit-normalized: {path} row={row} norm={norm}')
 print('Cross-graph input shapes:', shapes)
+PY
+
+# Angular ground truth is cosine based. Unit normalization makes squared L2
+# rank vectors in the same order; both graph implementations use these F32 files.
+PREPROCESSING="original_f32"
+if [[ "$DATASET" == *angular* ]]; then
+  source_dir="$HNSW_DATA_DIR"
+  HNSW_DATA_DIR="$OUTPUT_DIR/normalized_inputs"
+  mkdir -p "$HNSW_DATA_DIR"
+  python3 - "$source_dir" "$HNSW_DATA_DIR" "$DATASET" <<'PY'
+import math, pathlib, shutil, struct, sys
+source, target, name = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+for suffix in ('train.fvecs', 'test.fvecs'):
+    source_file, target_file = source / f'{name}_{suffix}', target / f'{name}_{suffix}'
+    with source_file.open('rb') as src, target_file.open('wb') as dst:
+        while header := src.read(4):
+            if len(header) != 4: raise SystemExit(f'Truncated header: {source_file}')
+            dim, = struct.unpack('<i', header)
+            values = struct.unpack('<%df' % dim, src.read(dim * 4))
+            norm = math.sqrt(sum(value * value for value in values))
+            if norm == 0 or not math.isfinite(norm):
+                raise SystemExit(f'Invalid angular vector norm: {source_file}')
+            dst.write(header)
+            dst.write(struct.pack('<%df' % dim, *(value / norm for value in values)))
+shutil.copyfile(source / f'{name}_neighbors.ivecs', target / f'{name}_neighbors.ivecs')
+print(f'Unit-normalized F32 train/query inputs: {target}')
+PY
+  PREPROCESSING="unit_normalized_f32"
+fi
+
+DIM="$(python3 - "$HNSW_DATA_DIR/${DATASET}_train.fvecs" <<'PY'
+import struct, sys
+with open(sys.argv[1], 'rb') as f:
+    print(struct.unpack('<i', f.read(4))[0])
+PY
+)"
+if (( DIM <= 0 || DIM % 8 != 0 )); then
+  echo "Dimension must be a positive multiple of 8 for dim/8 PQ: $DIM" >&2
+  exit 1
+fi
+PQ_BYTES=$((DIM / 8))
+python3 - "$OUTPUT_DIR/config.json" "$DATASET" "$DIM" "$PQ_BYTES" "$PREPROCESSING" <<'PY'
+import json, pathlib, sys
+path, dataset, dim, pq_bytes, preprocessing = sys.argv[1:]
+pathlib.Path(path).write_text(json.dumps(dict(dataset=dataset, vectors='full_train',
+    dimension=int(dim), input_precision='F32', preprocessing=preprocessing,
+    root_policy='top_1_percent_degree', chain_max=[2,4,8,-1],
+    decoding_cache_ratio=0.01, pq_bytes=int(pq_bytes), two_level_alpha=0.2,
+    search_chain_max=2, payload_ratio_basis='raw_f32_bytes/compressed_vector_bytes',
+    index_ratio_basis='raw_f32_vector_plus_graph/compressed_vector_plus_graph_and_metadata',
+    index_ratio_excludes_pq=True, index_ratio_excludes_decoding_cache=True,
+    reference_l2='Euclidean distance to parent; summary excludes roots',
+    average_depth='Number of parent edges averaged over all nodes; roots have depth zero',
+    deep_vamana_index_ratio='Estimated metadata; deep records are compression-only'), indent=2) + '\n')
 PY
 
 if [[ ! -f "$DISKANN_BUILD_DIR/CMakeCache.txt" ]]; then
@@ -134,7 +176,7 @@ echo "Building and searching HNSW indexes"
     "$HNSW_BUILD_DIR/test_search_compressed_hnsw_ablation" \
       --base_dir "$HNSW_DATA_DIR" --dataset "$DATASET" \
       --algorithm DeXOR Gorilla Elf --chain_max 2 --root_policy degree --threads "$SEARCH_THREADS" \
-      --k "$k" --ef 20 50 100 --use_cache 1 --use_tls 0 1 --tls_ratio 0.2 \
+      --k "$k" --ef 20 50 100 --use_cache 1 --use_tls 0 1 --tls_ratio 0.2 --no_early_stop \
       --num_rounds "$ROUNDS" --output_csv "hnsw_search_k${k}.csv" \
       > "hnsw_search_k${k}.log" 2>&1
   done
@@ -146,9 +188,9 @@ echo "Building Vamana graph and PQ codes"
 graph="$OUTPUT_DIR/vamana_R32_L50_A1.2"
 "$DISKANN_BUILD_DIR/apps/build_memory_index" \
   --data_type float --dist_fn l2 --data_path "$train" --index_path_prefix "$graph" \
-  -R 32 -L 50 -T "$BUILD_THREADS" --alpha 1.2 --build_PQ_bytes 16 \
+  -R 32 -L 50 -T "$BUILD_THREADS" --alpha 1.2 --build_PQ_bytes "$PQ_BYTES" \
   > "$OUTPUT_DIR/vamana_build.log" 2>&1
-for suffix in pq16_pivots.bin pq16_compressed.bin; do
+for suffix in "pq${PQ_BYTES}_pivots.bin" "pq${PQ_BYTES}_compressed.bin"; do
   [[ -s "${train}${suffix}" ]] || { echo "Missing PQ file: ${train}${suffix}" >&2; exit 1; }
 done
 
@@ -177,7 +219,7 @@ for codec in raw dexor gorilla elf; do
       --data_type float --dist_fn l2 --index_path_prefix "${prefix}_${codec}" \
       --query_file "$query" --gt_file "$gt" \
       -K "$k" -L 20 50 100 -T "$SEARCH_THREADS" -R "$ROUNDS" \
-      --use_pq_dist "$tls" --pq_bytes 16 --pq_prefix "$train" \
+      --use_pq_dist "$tls" --pq_bytes "$PQ_BYTES" --pq_prefix "$train" \
       --pq_exact_rerank_ratio 0.2 --lvc_state_cache_ratio 0.01 \
       --result_path "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}" \
       > "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}.log" 2>&1
@@ -187,9 +229,9 @@ for codec in raw dexor gorilla elf; do
   done
 done
 
-python3 - "$OUTPUT_DIR" <<'PY'
+python3 - "$OUTPUT_DIR" "$DATASET" <<'PY'
 import csv, pathlib, re, sys
-out = pathlib.Path(sys.argv[1])
+out, dataset = pathlib.Path(sys.argv[1]), sys.argv[2]
 for k in (1, 10):
   for tls in (0, 1):
     for L in (20, 50, 100):
@@ -214,22 +256,26 @@ for line in (out / 'vamana_compression.log').read_text().splitlines():
 rows = []
 for k in (1, 10):
     for row in csv.DictReader((out / f'hnsw_search_k{k}.csv').open()):
-        rows.append(dict(graph='HNSW', codec=row['Algorithm'], k=k, tls=row['UseTwoLevelSearch'],
+        rows.append(dict(dataset=dataset, graph='HNSW', codec=row['Algorithm'].lower(),
+                         chain_max=2, k=k, tls=row['UseTwoLevelSearch'],
+                         alpha=row['TlsRatio'],
                          search_width=row['ef'], recall=row['Recall'], qps=row['QPS'],
-                         mean_us=row['TimePerQuery(us)'], p99_us=row['P99_Latency(us)'],
-                         metric='p99'))
+                         mean_us=row['TimePerQuery(us)'], tail_us=row['P99_Latency(us)'],
+                         tail_quantile='0.99'))
     for codec in ('raw', 'dexor', 'gorilla', 'elf'):
       for tls in (0, 1):
         for row in csv.DictReader((out / f'vamana_{codec}_k{k}_tls{tls}.csv').open()):
-            rows.append(dict(graph='Vamana', codec=codec, k=k, tls=tls,
+            rows.append(dict(dataset=dataset, graph='Vamana', codec=codec,
+                             chain_max=2, k=k, tls=tls, alpha=0.2 if tls else 0.0,
                              search_width=row['Ls'], recall=row[f'Recall@{k}'],
                              qps=row['QPS'], mean_us=row['Mean Latency (mus)'],
-                             p99_us=row['99.9 Latency'], metric='p999'))
-with (out / 'pilot_search_summary.csv').open('w', newline='') as f:
-    writer = csv.DictWriter(f, fieldnames=('graph', 'codec', 'k', 'tls', 'search_width',
-                                           'recall', 'qps', 'mean_us', 'p99_us', 'metric'))
+                             tail_us=row['99.9 Latency'], tail_quantile='0.999'))
+with (out / 'retrieval_ch2.csv').open('w', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=('dataset', 'graph', 'codec', 'chain_max', 'k',
+                                           'tls', 'alpha', 'search_width', 'recall',
+                                           'qps', 'mean_us', 'tail_us', 'tail_quantile'))
     writer.writeheader()
     writer.writerows(rows)
-print(f'Wrote {len(rows)} retrieval rows to {out / "pilot_search_summary.csv"}')
+print(f'Wrote {len(rows)} retrieval rows to {out / "retrieval_ch2.csv"}')
 PY
 echo "Cross-graph results: $OUTPUT_DIR"

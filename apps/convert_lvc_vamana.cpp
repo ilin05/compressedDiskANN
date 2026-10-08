@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -26,7 +27,8 @@ void convert_codec(const char *name, uint32_t mode, const std::string &source,
                    const std::string &output, const diskann::lvc::Forest &forest,
                    const std::vector<float> &vectors, uint32_t count, uint32_t dim,
                    bool compression_only, std::ofstream &stats, double mean_reference_l2,
-                   uint32_t max_depth) {
+                   double p50_reference_l2, double p95_reference_l2,
+                   double average_depth, double average_nonroot_depth, uint32_t max_depth) {
     const auto start = std::chrono::steady_clock::now();
     const auto vector = [&](uint32_t id) { return vectors.data() + uint64_t(id) * dim; };
     auto store = diskann::lvc::RecordStore<Codec>::build(forest, dim, vector);
@@ -48,6 +50,7 @@ void convert_codec(const char *name, uint32_t mode, const std::string &source,
         : std::filesystem::file_size(prefix + ".data") - store.bytes.size();
     const uint64_t graph_bytes = std::filesystem::file_size(source);
     const uint64_t raw_index_bytes = graph_bytes + 32 + raw_bytes;
+    const uint64_t compressed_index_bytes = graph_bytes + store.bytes.size() + metadata_bytes;
     const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     std::cout << name << " roots=" << forest.initial_roots
               << " fallback=" << forest.fallback_nodes
@@ -58,13 +61,16 @@ void convert_codec(const char *name, uint32_t mode, const std::string &source,
               << " payload_ratio=" << std::fixed << std::setprecision(4)
               << double(raw_bytes) / store.bytes.size()
               << " data_file_ratio=" << double(raw_bytes) / (store.bytes.size() + metadata_bytes)
-              << " full_index_ratio=" << double(raw_index_bytes) / (graph_bytes + store.bytes.size() + metadata_bytes)
+              << " full_index_ratio=" << double(raw_index_bytes) / compressed_index_bytes
               << " build_seconds=" << elapsed << '\n';
     stats << name << ',' << count << ',' << forest.initial_roots << ',' << forest.fallback_nodes << ','
-          << max_depth << ',' << mean_reference_l2 << ',' << store.patches << ',' << store.patches * 8 << ',' << store.bytes.size()
+          << max_depth << ',' << average_depth << ',' << average_nonroot_depth << ','
+          << mean_reference_l2 << ',' << p50_reference_l2 << ',' << p95_reference_l2 << ','
+          << store.patches << ',' << store.patches * 8 << ',' << store.bytes.size()
           << ',' << metadata_bytes << ',' << graph_bytes << ',' << raw_bytes << ','
+          << raw_index_bytes << ',' << compressed_index_bytes << ','
           << double(raw_bytes) / store.bytes.size() << ','
-          << double(raw_index_bytes) / (graph_bytes + store.bytes.size() + metadata_bytes) << ','
+          << double(raw_index_bytes) / compressed_index_bytes << ','
           << (compression_only ? 0 : 1) << '\n';
 }
 
@@ -119,11 +125,15 @@ int main(int argc, char **argv) {
         const auto vector = [&](uint32_t id) { return vectors.data() + uint64_t(id) * dim; };
         const auto forest = diskann::lvc::build_forest(count, dim, neighbors, vector, chain_max);
         uint32_t max_depth = 0;
+        uint64_t depth_sum = 0;
         double distance_sum = 0;
+        std::vector<double> reference_distances;
+        reference_distances.reserve(count - forest.initial_roots);
         std::ofstream forest_csv(output + "_forest.csv");
         forest_csv << "node,degree,parent,depth,reference_l2\n";
         for (uint32_t id = 0; id < count; ++id) {
             max_depth = std::max(max_depth, forest.depth[id]);
+            depth_sum += forest.depth[id];
             double distance = 0;
             if (forest.parent[id] != diskann::lvc::no_parent) {
                 const float *a = vector(id), *b = vector(forest.parent[id]);
@@ -133,19 +143,26 @@ int main(int argc, char **argv) {
                 }
                 distance = std::sqrt(distance);
                 distance_sum += distance;
+                reference_distances.push_back(distance);
             }
             forest_csv << id << ',' << graph[id].size() << ',';
             if (forest.parent[id] != diskann::lvc::no_parent) forest_csv << forest.parent[id];
             forest_csv << ',' << forest.depth[id] << ',' << distance << '\n';
         }
         const double mean_reference_l2 = distance_sum / (count - forest.initial_roots == 0 ? 1 : count - forest.initial_roots);
+        const double average_depth = double(depth_sum) / count;
+        const double average_nonroot_depth = double(depth_sum) / std::max<uint32_t>(1, count - forest.initial_roots);
+        std::sort(reference_distances.begin(), reference_distances.end());
+        const double p50_reference_l2 = reference_distances.empty() ? 0 : reference_distances[(reference_distances.size() - 1) / 2];
+        const double p95_reference_l2 = reference_distances.empty() ? 0 : reference_distances[(reference_distances.size() - 1) * 95 / 100];
         std::ofstream stats(output + "_compression.csv");
-        stats << "codec,nodes,roots,fallback,max_depth,mean_reference_l2,patches,patch_bytes,payload_bytes,metadata_bytes,graph_bytes,raw_f32_bytes,payload_ratio_f32,full_index_ratio_f32,record_file_materialized\n";
+        stats << "codec,nodes,roots,fallback,max_depth,average_depth,average_nonroot_depth,mean_reference_l2,p50_reference_l2,p95_reference_l2,patches,patch_bytes,payload_bytes,metadata_bytes,graph_bytes,raw_f32_bytes,raw_f32_index_bytes,compressed_index_bytes,payload_ratio_f32,full_index_ratio_f32,record_file_materialized\n";
         std::cout << "forest nodes=" << count << " dim=" << dim
                   << " roots=" << forest.initial_roots
                   << " fallback=" << forest.fallback_nodes
                   << " rounds=" << forest.propagation_rounds
-                  << " max_depth=" << max_depth << " mean_reference_l2=" << mean_reference_l2 << '\n';
+                  << " max_depth=" << max_depth << " average_depth=" << average_depth
+                  << " mean_reference_l2=" << mean_reference_l2 << '\n';
 
         const std::string raw_prefix = output + "_raw";
         if (!compression_only) {
@@ -154,9 +171,9 @@ int main(int argc, char **argv) {
             std::cout << "raw graph_bytes=" << std::filesystem::file_size(raw_prefix)
                       << " data_bytes=" << std::filesystem::file_size(raw_prefix + ".data") << '\n';
         }
-        convert_codec<hnswlib::codecs::DeXORCodecPolicy>("dexor", 2, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, max_depth);
-        convert_codec<hnswlib::codecs::GorillaCodecPolicy>("gorilla", 3, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, max_depth);
-        convert_codec<hnswlib::codecs::ElfCodecPolicy>("elf", 4, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, max_depth);
+        convert_codec<hnswlib::codecs::DeXORCodecPolicy>("dexor", 2, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
+        convert_codec<hnswlib::codecs::GorillaCodecPolicy>("gorilla", 3, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
+        convert_codec<hnswlib::codecs::ElfCodecPolicy>("elf", 4, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "D2 conversion failed: " << error.what() << '\n';
