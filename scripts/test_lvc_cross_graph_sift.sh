@@ -24,6 +24,14 @@ BUILD_THREADS="${BUILD_THREADS:-4}"
 SEARCH_THREADS="${SEARCH_THREADS:-1}"
 ROUNDS="${ROUNDS:-3}"
 CHAIN_SWEEP="2 4 8 -1"
+read -r -a HNSW_EFS <<< "${HNSW_EF_SWEEP:-10 20 30 40 60 80 100 150 200}"
+read -r -a VAMANA_L1 <<< "${VAMANA_L_K1:-1 2 3 4 5 6 8 10}"
+(( ${#HNSW_EFS[@]} && ${#VAMANA_L1[@]} )) || {
+  echo "Search-width sweeps must be nonempty" >&2; exit 1;
+}
+for width in "${VAMANA_L1[@]}"; do
+  (( width >= 1 )) || { echo "K=1 requires L>=1" >&2; exit 1; }
+done
 
 for kind in train.fvecs test.fvecs neighbors.ivecs; do
   file="$HNSW_DATA_DIR/${DATASET}_$kind"
@@ -106,13 +114,18 @@ if (( DIM <= 0 || DIM % 8 != 0 )); then
   exit 1
 fi
 PQ_BYTES=$((DIM / 8))
-python3 - "$OUTPUT_DIR/config.json" "$DATASET" "$DIM" "$PQ_BYTES" "$PREPROCESSING" <<'PY'
+python3 - "$OUTPUT_DIR/config.json" "$DATASET" "$DIM" "$PQ_BYTES" "$PREPROCESSING" \
+  "${HNSW_EFS[*]}" "${VAMANA_L1[*]}" <<'PY'
 import json, pathlib, sys
-path, dataset, dim, pq_bytes, preprocessing = sys.argv[1:]
+path, dataset, dim, pq_bytes, preprocessing, hnsw_efs, vamana_l1 = sys.argv[1:]
 pathlib.Path(path).write_text(json.dumps(dict(dataset=dataset, vectors='full_train',
     dimension=int(dim), input_precision='F32', preprocessing=preprocessing,
     root_policy='top_1_percent_degree', chain_max=[2,4,8,-1],
     decoding_cache_ratio=0.01, pq_bytes=int(pq_bytes), two_level_alpha=0.2,
+    hnsw_ef_search=[int(x) for x in hnsw_efs.split()],
+    vamana_l_by_k={'1': [int(x) for x in vamana_l1.split()]},
+    search_k=1,
+    retrieval_recall_unit='fraction_0_to_1',
     search_chain_max=2, payload_ratio_basis='raw_f32_bytes/compressed_vector_bytes',
     index_ratio_basis='raw_f32_vector_plus_graph/compressed_vector_plus_graph_and_metadata',
     index_ratio_excludes_pq=True, index_ratio_excludes_decoding_cache=True,
@@ -172,14 +185,12 @@ echo "Building and searching HNSW indexes"
     --algorithm DeXOR Gorilla Elf --chain_max $CHAIN_SWEEP --root_policy degree --f32_lossless --reuse_graph --threads "$BUILD_THREADS" \
     --M 16 --ef_construction 200 --output_csv hnsw_build.csv \
     > hnsw_build.log 2>&1
-  for k in 1 10; do
-    "$HNSW_BUILD_DIR/test_search_compressed_hnsw_ablation" \
-      --base_dir "$HNSW_DATA_DIR" --dataset "$DATASET" \
-      --algorithm DeXOR Gorilla Elf --chain_max 2 --root_policy degree --threads "$SEARCH_THREADS" \
-      --k "$k" --ef 20 50 100 --use_cache 1 --use_tls 0 1 --tls_ratio 0.2 --no_early_stop \
-      --num_rounds "$ROUNDS" --output_csv "hnsw_search_k${k}.csv" \
-      > "hnsw_search_k${k}.log" 2>&1
-  done
+  "$HNSW_BUILD_DIR/test_search_compressed_hnsw_ablation" \
+    --base_dir "$HNSW_DATA_DIR" --dataset "$DATASET" \
+    --algorithm DeXOR Gorilla Elf --chain_max 2 --root_policy degree --threads "$SEARCH_THREADS" \
+    --k 1 --ef "${HNSW_EFS[@]}" --use_cache 1 --use_tls 0 1 --tls_ratio 0.2 --no_early_stop \
+    --num_rounds "$ROUNDS" --output_csv hnsw_search_k1.csv \
+    > hnsw_search_k1.log 2>&1
 )
 
 # Vamana builds PQ along with the graph. PQDataStore writes the filenames
@@ -207,28 +218,28 @@ done
 for codec in raw dexor gorilla elf; do
   "$DISKANN_BUILD_DIR/apps/verify_lvc_vamana" "$train" "${prefix}_${codec}.data" \
     > "$OUTPUT_DIR/vamana_verify_${codec}.log" 2>&1
-  for k in 1 10; do
-    for tls in 0 1; do
+  for tls in 0 1; do
     "$DISKANN_BUILD_DIR/apps/search_memory_index" \
       --data_type float --dist_fn l2 --index_path_prefix "${prefix}_${codec}" \
       --query_file "$query" --gt_file "$gt" \
-      -K "$k" -L 20 50 100 -T "$SEARCH_THREADS" -R "$ROUNDS" \
+      -K 1 -L "${VAMANA_L1[@]}" -T "$SEARCH_THREADS" -R "$ROUNDS" \
       --use_pq_dist "$tls" --pq_bytes "$PQ_BYTES" --pq_prefix "$train" \
       --pq_exact_rerank_ratio 0.2 --lvc_state_cache_ratio 0.01 \
-      --result_path "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}" \
-      > "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}.log" 2>&1
-    cp "${prefix}_${codec}_K${k}_T${SEARCH_THREADS}_search_result.csv" \
-      "$OUTPUT_DIR/vamana_${codec}_k${k}_tls${tls}.csv"
-    done
+      --result_path "$OUTPUT_DIR/vamana_${codec}_k1_tls${tls}" \
+      > "$OUTPUT_DIR/vamana_${codec}_k1_tls${tls}.log" 2>&1
+    cp "${prefix}_${codec}_K1_T${SEARCH_THREADS}_search_result.csv" \
+      "$OUTPUT_DIR/vamana_${codec}_k1_tls${tls}.csv"
   done
 done
 
-python3 - "$OUTPUT_DIR" "$DATASET" <<'PY'
+python3 - "$OUTPUT_DIR" "$DATASET" "${HNSW_EFS[*]}" "${VAMANA_L1[*]}" <<'PY'
 import csv, pathlib, re, sys
 out, dataset = pathlib.Path(sys.argv[1]), sys.argv[2]
-for k in (1, 10):
+hnsw_efs = [int(x) for x in sys.argv[3].split()]
+vamana_widths = [int(x) for x in sys.argv[4].split()]
+for k in (1,):
   for tls in (0, 1):
-    for L in (20, 50, 100):
+    for L in vamana_widths:
         for kind in ('idx_uint32.bin', 'dists_float.bin'):
             raw = (out / f'vamana_raw_k{k}_tls{tls}_{L}_{kind}').read_bytes()
             for codec in ('dexor', 'gorilla', 'elf'):
@@ -237,7 +248,7 @@ for k in (1, 10):
                     first = next((i for i, pair in enumerate(zip(candidate, raw))
                                   if pair[0] != pair[1]), min(len(candidate), len(raw)))
                     raise SystemExit(f'FAIL Vamana {codec} K={k} L={L} {kind} byte={first}')
-print('PASS Vamana: all codec IDs and L2 bits match raw for every K/L')
+print('PASS Vamana: all codec IDs and L2 bits match raw for every K=1 L')
 print('\nHNSW compression (common F32 baseline):')
 for row in csv.DictReader((out / 'hnsw_build.csv').open()):
     print(row['Algorithm'], 'chain=', row['ChainMaxLength'], 'data_ratio_f32=', row['PayloadRatioF32'],
@@ -248,20 +259,39 @@ for line in (out / 'vamana_compression.log').read_text().splitlines():
     if re.match(r'^(forest|raw|dexor|gorilla|elf)\b', line):
         print(line)
 rows = []
-for k in (1, 10):
-    for row in csv.DictReader((out / f'hnsw_search_k{k}.csv').open()):
+# HNSW reports recall in [0,1], while DiskANN reports percentages in [0,100].
+# Store a shared fractional scale before comparing recall-latency points.
+for k in (1,):
+    hnsw_rows = list(csv.DictReader((out / f'hnsw_search_k{k}.csv').open()))
+    expected = 3 * 2 * len(hnsw_efs)
+    if len(hnsw_rows) != expected:
+        raise SystemExit(f'HNSW K={k}: expected {expected} rows, got {len(hnsw_rows)}')
+    actual = sorted((row['Algorithm'].lower(), row['UseTwoLevelSearch'], int(row['ef']))
+                    for row in hnsw_rows)
+    expected_keys = sorted((codec, str(tls), ef)
+                           for codec in ('dexor', 'gorilla', 'elf')
+                           for tls in (0, 1) for ef in hnsw_efs)
+    if actual != expected_keys:
+        raise SystemExit(f'HNSW K={k}: codec/TLS/ef sweep is incomplete or duplicated')
+    for row in hnsw_rows:
         rows.append(dict(dataset=dataset, graph='HNSW', codec=row['Algorithm'].lower(),
                          chain_max=2, k=k, tls=row['UseTwoLevelSearch'],
                          alpha=row['TlsRatio'],
-                         search_width=row['ef'], recall=row['Recall'], qps=row['QPS'],
+                         search_width=row['ef'], recall=float(row['Recall']), qps=row['QPS'],
                          mean_us=row['TimePerQuery(us)'], tail_us=row['P99_Latency(us)'],
                          tail_quantile='0.99'))
     for codec in ('raw', 'dexor', 'gorilla', 'elf'):
       for tls in (0, 1):
-        for row in csv.DictReader((out / f'vamana_{codec}_k{k}_tls{tls}.csv').open()):
+        vamana_rows = list(csv.DictReader((out / f'vamana_{codec}_k{k}_tls{tls}.csv').open()))
+        if len(vamana_rows) != len(vamana_widths):
+            raise SystemExit(f'Vamana {codec} K={k} TLS={tls}: expected '
+                             f'{len(vamana_widths)} rows, got {len(vamana_rows)}')
+        if sorted(int(row['Ls']) for row in vamana_rows) != sorted(vamana_widths):
+            raise SystemExit(f'Vamana {codec} K={k} TLS={tls}: L sweep is incomplete or duplicated')
+        for row in vamana_rows:
             rows.append(dict(dataset=dataset, graph='Vamana', codec=codec,
                              chain_max=2, k=k, tls=tls, alpha=0.2 if tls else 0.0,
-                             search_width=row['Ls'], recall=row[f'Recall@{k}'],
+                             search_width=row['Ls'], recall=float(row[f'Recall@{k}']) / 100.0,
                              qps=row['QPS'], mean_us=row['Mean Latency (mus)'],
                              tail_us=row['99.9 Latency'], tail_quantile='0.999'))
 with (out / 'retrieval_ch2.csv').open('w', newline='') as f:

@@ -5,6 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_ROOT="${CROSS_GRAPH_OUTPUT_ROOT:-$SCRIPT_DIR/../build/data/cross_graph_transfer}"
 mkdir -p "$OUTPUT_ROOT"
 OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd)"
+export HNSW_EF_SWEEP="${HNSW_EF_SWEEP:-10 20 30 40 60 80 100 150 200}"
+export VAMANA_L_K1="${VAMANA_L_K1:-1 2 3 4 5 6 8 10}"
+echo "HNSW efSearch: $HNSW_EF_SWEEP"
+echo "Vamana K=1 L: $VAMANA_L_K1"
 for dataset in \
   sift-128-euclidean \
   mnist-784-euclidean \
@@ -79,4 +83,42 @@ with (root / 'retrieval_alpha_0p2.csv').open('w', newline='') as f:
     writer = csv.DictWriter(f, fieldnames=retrieval[0].keys())
     writer.writeheader(); writer.writerows(rows)
 print(root / 'retrieval_alpha_0p2.csv', 'rows=', len(rows))
+
+# Select the fastest measured point on each graph whose Recall@1 reaches the
+# same threshold. This compares recall-aligned latency without interpolating or
+# assuming that HNSW efSearch and Vamana L have equivalent meanings.
+aligned = []
+for dataset in datasets:
+    for k in (1,):
+        for codec in ('dexor', 'gorilla', 'elf'):
+            for tls in ('0', '1'):
+                pair = {graph: [row for row in retrieval if row['dataset'] == dataset
+                                and row['graph'] == graph and row['codec'] == codec
+                                and int(row['k']) == k and row['tls'] == tls]
+                        for graph in ('HNSW', 'Vamana')}
+                if not all(pair.values()):
+                    raise SystemExit(f'Missing retrieval curve: {dataset} K={k} {codec} TLS={tls}')
+                targets = sorted({round(float(row['recall']), 6)
+                                  for graph_rows in pair.values() for row in graph_rows})
+                for target in targets:
+                    eligible = {graph: [row for row in graph_rows
+                                        if float(row['recall']) + 1e-9 >= target]
+                                for graph, graph_rows in pair.items()}
+                    if not all(eligible.values()):
+                        continue
+                    best = {graph: min(graph_rows, key=lambda row: float(row['mean_us']))
+                            for graph, graph_rows in eligible.items()}
+                    hnsw, vamana = best['HNSW'], best['Vamana']
+                    aligned.append(dict(dataset=dataset, codec=codec, k=k, tls=tls,
+                        target_recall=target,
+                        hnsw_recall=hnsw['recall'], hnsw_ef=hnsw['search_width'],
+                        hnsw_mean_us=hnsw['mean_us'],
+                        vamana_recall=vamana['recall'], vamana_L=vamana['search_width'],
+                        vamana_mean_us=vamana['mean_us'],
+                        vamana_over_hnsw_latency=float(vamana['mean_us']) / float(hnsw['mean_us'])))
+path = root / 'recall_aligned_latency.csv'
+with path.open('w', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=aligned[0].keys())
+    writer.writeheader(); writer.writerows(aligned)
+print(path, 'rows=', len(aligned), '(minimum measured latency at Recall@1 >= target)')
 PY
