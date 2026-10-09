@@ -224,11 +224,30 @@ template <typename data_t> location_t PQDataStore<data_t>::load_impl(const std::
     if (_quantized_data != nullptr)
     {
         aligned_free(_quantized_data);
+        _quantized_data = nullptr;
     }
     auto quantized_vectors_file = _pq_distance_fn->get_quantized_vectors_filename(file_prefix);
 
-    size_t num_points;
-    load_aligned_bin(quantized_vectors_file, _quantized_data, num_points, _num_chunks, _num_chunks);
+    size_t num_points, file_chunks, aligned_chunks;
+    uint8_t *aligned_data = nullptr;
+    load_aligned_bin(quantized_vectors_file, aligned_data, num_points, file_chunks, aligned_chunks);
+    if (file_chunks != _num_chunks)
+    {
+        aligned_free(aligned_data);
+        throw diskann::ANNException("PQ code width does not match configured number of chunks", -1, __FUNCSIG__,
+                                    __FILE__, __LINE__);
+    }
+    if (aligned_chunks == file_chunks)
+    {
+        _quantized_data = aligned_data;
+    }
+    else
+    {
+        alloc_aligned((void **)&_quantized_data, ROUND_UP(num_points * file_chunks * sizeof(uint8_t), 8), 8);
+        for (size_t i = 0; i < num_points; ++i)
+            memcpy(_quantized_data + i * file_chunks, aligned_data + i * aligned_chunks, file_chunks);
+        aligned_free(aligned_data);
+    }
     this->_capacity = (location_t)num_points;
 
     auto pivots_file = _pq_distance_fn->get_pivot_data_filename(file_prefix);
