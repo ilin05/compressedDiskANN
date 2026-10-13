@@ -1,0 +1,27 @@
+nohup: ignoring input
+[ 95%] Built target diskann
+[100%] Built target search_disk_index
+Using bigann1M pilot counts from /home/zmy/compressedDiskANN/scripts/lvc_disk_budget_results/bigann_1M/summary.csv
+points=1000000000 pq_bytes_per_vector=32 pq_file_bytes=32000000008 non_pq_budget_bytes=34359738368
+raw probe=0 nodes=39077000 bytes=42345457184 utilization=1.232
+raw probe=1 nodes=30122280 bytes=36578617504 utilization=1.065
+raw probe=2 nodes=26880293 bytes=34490777876 utilization=1.004
+raw probe=3 nodes=25439259 bytes=33562751980 utilization=0.977
+raw probe=4 nodes=26159776 bytes=34026764928 utilization=0.990
+raw probe=5 nodes=26520034 bytes=34258771080 utilization=0.997
+raw probe=6 nodes=26700163 bytes=34374774156 utilization=1.000
+raw probe=7 nodes=26610098 bytes=34316772296 utilization=0.999
+SELECT raw: nodes=26610098 budget_bytes=34316772296 utilization=0.999; node 26700163 exceeds budget; gap=90065
+alp probe=0 nodes=65536000 bytes=51291892912 utilization=1.493
+alp probe=1 nodes=41706587 bytes=45121408394 utilization=1.313
+alp probe=2 nodes=30171399 bytes=24967681746 utilization=0.727
+alp probe=3 nodes=35938993 bytes=26454778750 utilization=0.770
+alp probe=4 nodes=38822790 bytes=27198133268 utilization=0.792
+alp probe=5 nodes=40264688 bytes=27569872384 utilization=0.802
+alp probe=6 nodes=40985637 bytes=27755765302 utilization=0.808
+alp probe=7 nodes=41346112 bytes=45028531504 utilization=1.311
+alp probe=8 nodes=41165874 bytes=44982070988 utilization=1.309
+alp probe=9 nodes=41075755 bytes=27778993546 utilization=0.808
+SELECT alp: nodes=41075755 budget_bytes=27778993546 utilization=0.808; node 41165874 exceeds budget; gap=90119
+dexor probe=0 nodes=65536000 bytes=56363247940 utilization=1.640
+dexor probe=1 nodes=37953984 bytes=29962891527 utilization=0.872

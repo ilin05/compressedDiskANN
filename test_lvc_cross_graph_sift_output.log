@@ -1,0 +1,53 @@
+nohup: ignoring input
+SIFT input shapes: {'train.fvecs': (1000000, 128), 'test.fvecs': (10000, 128), 'neighbors.ivecs': (10000, 100)}
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[100%] Built target build_memory_index
+[ 95%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target test_build_compressed_hnsw_ablation
+Built target test_search_compressed_hnsw_ablation
+Converting SIFT inputs to DiskANN bin format
+Dataset: #pts = 1000000, # dims = 128
+# blks: 8
+Block #0 written
+Block #1 written
+Block #2 written
+Block #3 written
+Block #4 written
+Block #5 written
+Block #6 written
+Block #7 written
+Dataset: #pts = 10000, # dims = 128
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=1000000 dim=128 bytes=512000008
+Converted test.fvecs: n=10000 dim=128 bytes=5120008
+Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
+Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=1000000 dim=128 roots=10000 fallback=0 rounds=9
+raw graph_bytes=105018916 data_bytes=512000032
+dexor roots=10000 fallback=0 patches=0 payload_bytes=169365844 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=3.0230 data_file_ratio=2.6896 full_index_ratio=2.0889 build_seconds=25.9459
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=911676340 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=0.5616 data_file_ratio=0.5490 full_index_ratio=0.5946 build_seconds=22.7712
+elf roots=10000 fallback=0 patches=0 payload_bytes=289422852 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=1.7690 data_file_ratio=1.6494 full_index_ratio=1.4852 build_seconds=20.9949
+PASS Vamana: all codec IDs and L2 bits match raw for every K/L
+
+HNSW compression (baseline: F64):
+DeXOR data_ratio= 6.391489 index_ratio= 4.236235 build_s= 447.799222 compress_s= 142.739216
+Gorilla data_ratio= 1.150603 index_ratio= 1.167780 build_s= 422.956272 compress_s= 132.607060
+Elf data_ratio= 3.685065 index_ratio= 2.975332 build_s= 440.657589 compress_s= 140.713699
+
+Vamana compression (baseline: F32):
+forest nodes=1000000 dim=128 roots=10000 fallback=0 rounds=9
+raw graph_bytes=105018916 data_bytes=512000032
+dexor roots=10000 fallback=0 patches=0 payload_bytes=169365844 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=3.0230 data_file_ratio=2.6896 full_index_ratio=2.0889 build_seconds=25.9459
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=911676340 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=0.5616 data_file_ratio=0.5490 full_index_ratio=0.5946 build_seconds=22.7712
+elf roots=10000 fallback=0 patches=0 payload_bytes=289422852 metadata_bytes=21000032 graph_bytes=105018916 payload_ratio=1.7690 data_file_ratio=1.6494 full_index_ratio=1.4852 build_seconds=20.9949
+Wrote 42 retrieval rows to /home/zmy/compressedDiskANN/build/data/sift_cross_graph/pilot_search_summary.csv
+SIFT pilot results: /home/zmy/compressedDiskANN/build/data/sift_cross_graph

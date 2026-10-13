@@ -1,0 +1,364 @@
+nohup: ignoring input
+HNSW efSearch: 10 20 30 40 60 80 100 150 200
+Vamana K=1 L: 1 2 3 4 5 6 8 10
+Cross-graph transfer: sift-128-euclidean
+Cross-graph input shapes: {'train.fvecs': (1000000, 128), 'test.fvecs': (10000, 128), 'neighbors.ivecs': (10000, 100)}
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[ 95%] Linking CXX executable build_memory_index
+[100%] Built target build_memory_index
+[ 90%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target convert_lvc_vamana
+[100%] Built target verify_lvc_vamana
+[100%] Built target test_build_compressed_hnsw_ablation
+[100%] Built target test_search_compressed_hnsw_ablation
+Converting cross-graph inputs to DiskANN bin format
+Dataset: #pts = 1000000, # dims = 128
+# blks: 8
+Block #0 written
+Block #1 written
+Block #2 written
+Block #3 written
+Block #4 written
+Block #5 written
+Block #6 written
+Block #7 written
+Dataset: #pts = 10000, # dims = 128
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=1000000 dim=128 bytes=512000008
+Converted test.fvecs: n=10000 dim=128 bytes=5120008
+Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
+Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=1000000 dim=128 roots=10000 fallback=0 rounds=10 max_depth=1 average_depth=0.99 mean_reference_l2=246.308
+raw graph_bytes=105072316 data_bytes=512000032
+dexor roots=10000 fallback=0 patches=0 payload_bytes=169403564 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=3.0224 data_file_ratio=2.6890 full_index_ratio=2.0884 build_seconds=21.4106
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=911618921 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=0.5616 data_file_ratio=0.5490 full_index_ratio=0.5947 build_seconds=21.7318
+elf roots=10000 fallback=0 patches=0 payload_bytes=289413880 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=1.7691 data_file_ratio=1.6494 full_index_ratio=1.4852 build_seconds=16.4778
+PASS Vamana: all codec IDs and L2 bits match raw for every K=1 L
+
+HNSW compression (common F32 baseline):
+DeXOR chain= 2 data_ratio_f32= 3.189098 index_ratio_f32= 2.245865 build_s= 441.065018 compress_s= 180.023735
+DeXOR chain= 4 data_ratio_f32= 3.189982 index_ratio_f32= 2.246220 build_s= 441.065018 compress_s= 1080.752694
+DeXOR chain= 8 data_ratio_f32= 3.263352 index_ratio_f32= 2.275331 build_s= 441.065018 compress_s= 231.949485
+DeXOR chain= -1 data_ratio_f32= 3.288496 index_ratio_f32= 2.285176 build_s= 441.065018 compress_s= 282.748168
+Gorilla chain= 2 data_ratio_f32= 0.570255 index_ratio_f32= 0.621496 build_s= 441.065018 compress_s= 158.662089
+Gorilla chain= 4 data_ratio_f32= 1.730121 index_ratio_f32= 1.517548 build_s= 441.065018 compress_s= 1036.557115
+Gorilla chain= 8 data_ratio_f32= 2.056891 index_ratio_f32= 1.710131 build_s= 441.065018 compress_s= 159.950400
+Gorilla chain= -1 data_ratio_f32= 2.143094 index_ratio_f32= 1.757633 build_s= 441.065018 compress_s= 181.076597
+Elf chain= 2 data_ratio_f32= 1.832194 index_ratio_f32= 1.579942 build_s= 441.065018 compress_s= 159.360158
+Elf chain= 4 data_ratio_f32= 2.191184 index_ratio_f32= 1.783578 build_s= 441.065018 compress_s= 970.277951
+Elf chain= 8 data_ratio_f32= 2.271961 index_ratio_f32= 1.826291 build_s= 441.065018 compress_s= 179.758478
+Elf chain= -1 data_ratio_f32= 2.298165 index_ratio_f32= 1.839919 build_s= 441.065018 compress_s= 190.739709
+
+Vamana compression (baseline: F32):
+forest nodes=1000000 dim=128 roots=10000 fallback=0 rounds=10 max_depth=1 average_depth=0.99 mean_reference_l2=246.308
+raw graph_bytes=105072316 data_bytes=512000032
+dexor roots=10000 fallback=0 patches=0 payload_bytes=169403564 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=3.0224 data_file_ratio=2.6890 full_index_ratio=2.0884 build_seconds=21.4106
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=911618921 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=0.5616 data_file_ratio=0.5490 full_index_ratio=0.5947 build_seconds=21.7318
+elf roots=10000 fallback=0 patches=0 payload_bytes=289413880 metadata_bytes=21000032 graph_bytes=105072316 payload_ratio=1.7691 data_file_ratio=1.6494 full_index_ratio=1.4852 build_seconds=16.4778
+Wrote 118 retrieval rows to /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/sift-128-euclidean/retrieval_ch2.csv
+Cross-graph results: /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/sift-128-euclidean
+Cross-graph transfer: mnist-784-euclidean
+Cross-graph input shapes: {'train.fvecs': (60000, 784), 'test.fvecs': (10000, 784), 'neighbors.ivecs': (10000, 100)}
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[100%] Built target build_memory_index
+[ 90%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target convert_lvc_vamana
+[100%] Built target verify_lvc_vamana
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Configuring done (0.1s)
+-- Generating done (0.7s)
+-- Build files have been written to: /home/zmy/HNSWCW/compressedhnsw/build_lvc_sift
+[100%] Built target test_build_compressed_hnsw_ablation
+[100%] Built target test_search_compressed_hnsw_ablation
+Converting cross-graph inputs to DiskANN bin format
+Dataset: #pts = 60000, # dims = 784
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 784
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=60000 dim=784 bytes=188160008
+Converted test.fvecs: n=10000 dim=784 bytes=31360008
+Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
+Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=60000 dim=784 roots=600 fallback=0 rounds=5 max_depth=1 average_depth=0.99 mean_reference_l2=1483.75
+raw graph_bytes=5651520 data_bytes=188160032
+dexor roots=600 fallback=0 patches=0 payload_bytes=31579557 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=5.9583 data_file_ratio=5.7297 full_index_ratio=5.0352 build_seconds=4.4485
+gorilla roots=600 fallback=0 patches=0 payload_bytes=90212708 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=2.0857 data_file_ratio=2.0570 full_index_ratio=1.9955 build_seconds=3.1429
+elf roots=600 fallback=0 patches=0 payload_bytes=46313911 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=4.0627 data_file_ratio=3.9551 full_index_ratio=3.6413 build_seconds=3.1202
+PASS Vamana: all codec IDs and L2 bits match raw for every K=1 L
+
+HNSW compression (common F32 baseline):
+DeXOR chain= 2 data_ratio_f32= 6.054880 index_ratio_f32= 5.188170 build_s= 55.925241 compress_s= 125.433380
+DeXOR chain= 4 data_ratio_f32= 6.154675 index_ratio_f32= 5.258818 build_s= 55.925241 compress_s= 157.935326
+DeXOR chain= 8 data_ratio_f32= 6.241347 index_ratio_f32= 5.319854 build_s= 55.925241 compress_s= 137.474645
+DeXOR chain= -1 data_ratio_f32= 6.250711 index_ratio_f32= 5.326431 build_s= 55.925241 compress_s= 139.490051
+Gorilla chain= 2 data_ratio_f32= 2.096188 index_ratio_f32= 2.022904 build_s= 55.925241 compress_s= 128.031598
+Gorilla chain= 4 data_ratio_f32= 4.826363 index_ratio_f32= 4.284560 build_s= 55.925241 compress_s= 156.566200
+Gorilla chain= 8 data_ratio_f32= 5.436239 index_ratio_f32= 4.741140 build_s= 55.925241 compress_s= 125.587182
+Gorilla chain= -1 data_ratio_f32= 5.509061 index_ratio_f32= 4.794587 build_s= 55.925241 compress_s= 126.526431
+Elf chain= 2 data_ratio_f32= 4.104636 index_ratio_f32= 3.722679 build_s= 55.925241 compress_s= 127.335161
+Elf chain= 4 data_ratio_f32= 4.564282 index_ratio_f32= 4.083296 build_s= 55.925241 compress_s= 157.606275
+Elf chain= 8 data_ratio_f32= 4.648031 index_ratio_f32= 4.147949 build_s= 55.925241 compress_s= 132.118736
+Elf chain= -1 data_ratio_f32= 4.656788 index_ratio_f32= 4.154691 build_s= 55.925241 compress_s= 134.994004
+
+Vamana compression (baseline: F32):
+forest nodes=60000 dim=784 roots=600 fallback=0 rounds=5 max_depth=1 average_depth=0.99 mean_reference_l2=1483.75
+raw graph_bytes=5651520 data_bytes=188160032
+dexor roots=600 fallback=0 patches=0 payload_bytes=31579557 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=5.9583 data_file_ratio=5.7297 full_index_ratio=5.0352 build_seconds=4.4485
+gorilla roots=600 fallback=0 patches=0 payload_bytes=90212708 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=2.0857 data_file_ratio=2.0570 full_index_ratio=1.9955 build_seconds=3.1429
+elf roots=600 fallback=0 patches=0 payload_bytes=46313911 metadata_bytes=1260032 graph_bytes=5651520 payload_ratio=4.0627 data_file_ratio=3.9551 full_index_ratio=3.6413 build_seconds=3.1202
+Wrote 118 retrieval rows to /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/mnist-784-euclidean/retrieval_ch2.csv
+Cross-graph results: /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/mnist-784-euclidean
+Cross-graph transfer: fashion-mnist-784-euclidean
+Cross-graph input shapes: {'train.fvecs': (60000, 784), 'test.fvecs': (10000, 784), 'neighbors.ivecs': (10000, 100)}
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[100%] Built target build_memory_index
+[ 90%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target convert_lvc_vamana
+[100%] Built target verify_lvc_vamana
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Configuring done (0.1s)
+-- Generating done (0.4s)
+-- Build files have been written to: /home/zmy/HNSWCW/compressedhnsw/build_lvc_sift
+[100%] Built target test_build_compressed_hnsw_ablation
+[100%] Built target test_search_compressed_hnsw_ablation
+Converting cross-graph inputs to DiskANN bin format
+Dataset: #pts = 60000, # dims = 784
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 784
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=60000 dim=784 bytes=188160008
+Converted test.fvecs: n=10000 dim=784 bytes=31360008
+Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
+Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=60000 dim=784 roots=600 fallback=0 rounds=6 max_depth=1 average_depth=0.99 mean_reference_l2=1216.09
+raw graph_bytes=4682316 data_bytes=188160032
+dexor roots=600 fallback=0 patches=0 payload_bytes=51214326 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=3.6740 data_file_ratio=3.5858 full_index_ratio=3.3739 build_seconds=6.1835
+gorilla roots=600 fallback=0 patches=0 payload_bytes=215902293 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=0.8715 data_file_ratio=0.8664 full_index_ratio=0.8693 build_seconds=5.5055
+elf roots=600 fallback=0 patches=0 payload_bytes=79758676 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=2.3591 data_file_ratio=2.3224 full_index_ratio=2.2502 build_seconds=4.0233
+PASS Vamana: all codec IDs and L2 bits match raw for every K=1 L
+
+HNSW compression (common F32 baseline):
+DeXOR chain= 2 data_ratio_f32= 3.723793 index_ratio_f32= 3.458423 build_s= 42.224708 compress_s= 130.277788
+DeXOR chain= 4 data_ratio_f32= 3.811896 index_ratio_f32= 3.532106 build_s= 42.224708 compress_s= 234.094974
+DeXOR chain= 8 data_ratio_f32= 3.855949 index_ratio_f32= 3.568822 build_s= 42.224708 compress_s= 154.356182
+DeXOR chain= -1 data_ratio_f32= 3.860404 index_ratio_f32= 3.572530 build_s= 42.224708 compress_s= 148.214754
+Gorilla chain= 2 data_ratio_f32= 0.875428 index_ratio_f32= 0.878511 build_s= 42.224708 compress_s= 126.038281
+Gorilla chain= 4 data_ratio_f32= 2.454598 index_ratio_f32= 2.357975 build_s= 42.224708 compress_s= 223.646628
+Gorilla chain= 8 data_ratio_f32= 2.699735 index_ratio_f32= 2.576371 build_s= 42.224708 compress_s= 140.814100
+Gorilla chain= -1 data_ratio_f32= 2.720348 index_ratio_f32= 2.594604 build_s= 42.224708 compress_s= 132.833441
+Elf chain= 2 data_ratio_f32= 2.375918 index_ratio_f32= 2.287262 build_s= 42.224708 compress_s= 130.501246
+Elf chain= 4 data_ratio_f32= 2.777045 index_ratio_f32= 2.644652 build_s= 42.224708 compress_s= 231.576215
+Elf chain= 8 data_ratio_f32= 2.816709 index_ratio_f32= 2.679574 build_s= 42.224708 compress_s= 150.140826
+Elf chain= -1 data_ratio_f32= 2.820173 index_ratio_f32= 2.682620 build_s= 42.224708 compress_s= 141.702787
+
+Vamana compression (baseline: F32):
+forest nodes=60000 dim=784 roots=600 fallback=0 rounds=6 max_depth=1 average_depth=0.99 mean_reference_l2=1216.09
+raw graph_bytes=4682316 data_bytes=188160032
+dexor roots=600 fallback=0 patches=0 payload_bytes=51214326 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=3.6740 data_file_ratio=3.5858 full_index_ratio=3.3739 build_seconds=6.1835
+gorilla roots=600 fallback=0 patches=0 payload_bytes=215902293 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=0.8715 data_file_ratio=0.8664 full_index_ratio=0.8693 build_seconds=5.5055
+elf roots=600 fallback=0 patches=0 payload_bytes=79758676 metadata_bytes=1260032 graph_bytes=4682316 payload_ratio=2.3591 data_file_ratio=2.3224 full_index_ratio=2.2502 build_seconds=4.0233
+Wrote 118 retrieval rows to /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/fashion-mnist-784-euclidean/retrieval_ch2.csv
+Cross-graph results: /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/fashion-mnist-784-euclidean
+Cross-graph transfer: gist-960-euclidean
+Cross-graph input shapes: {'train.fvecs': (1000000, 960), 'test.fvecs': (1000, 960), 'neighbors.ivecs': (1000, 100)}
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[100%] Built target build_memory_index
+[ 90%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target convert_lvc_vamana
+[100%] Built target verify_lvc_vamana
+[100%] Built target test_build_compressed_hnsw_ablation
+[100%] Built target test_search_compressed_hnsw_ablation
+Converting cross-graph inputs to DiskANN bin format
+Dataset: #pts = 1000000, # dims = 960
+# blks: 8
+Block #0 written
+Block #1 written
+Block #2 written
+Block #3 written
+Block #4 written
+Block #5 written
+Block #6 written
+Block #7 written
+Dataset: #pts = 1000, # dims = 960
+# blks: 1
+Block #0 written
+Dataset: #pts = 1000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=1000000 dim=960 bytes=3840000008
+Converted test.fvecs: n=1000 dim=960 bytes=3840008
+Converted neighbors.ivecs: n=1000 dim=100 bytes=400008
+Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=1000000 dim=960 roots=10000 fallback=0 rounds=9 max_depth=1 average_depth=0.99 mean_reference_l2=1.18137
+raw graph_bytes=87574448 data_bytes=3840000032
+dexor roots=10000 fallback=0 patches=72282 payload_bytes=6398388233 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.6002 data_file_ratio=0.5982 full_index_ratio=0.6036 build_seconds=562.6739
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=7911040642 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.4854 data_file_ratio=0.4841 full_index_ratio=0.4897 build_seconds=175.2610
+elf roots=10000 fallback=0 patches=0 payload_bytes=4708767611 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.8155 data_file_ratio=0.8119 full_index_ratio=0.8153 build_seconds=155.1564
+PASS Vamana: all codec IDs and L2 bits match raw for every K=1 L
+
+HNSW compression (common F32 baseline):
+DeXOR chain= 2 data_ratio_f32= 0.601589 index_ratio_f32= 0.606951 build_s= 2637.624813 compress_s= 1830.374895
+DeXOR chain= 4 data_ratio_f32= 0.594443 index_ratio_f32= 0.599837 build_s= 2637.624813 compress_s= 37978.683116
+DeXOR chain= 8 data_ratio_f32= 0.593928 index_ratio_f32= 0.599324 build_s= 2637.624813 compress_s= 4945.717164
+DeXOR chain= -1 data_ratio_f32= 0.593444 index_ratio_f32= 0.598842 build_s= 2637.624813 compress_s= 3143.452505
+Gorilla chain= 2 data_ratio_f32= 0.485885 index_ratio_f32= 0.491488 build_s= 2637.624813 compress_s= 945.464217
+Gorilla chain= 4 data_ratio_f32= 0.855470 index_ratio_f32= 0.858221 build_s= 2637.624813 compress_s= 33906.602223
+Gorilla chain= 8 data_ratio_f32= 0.882010 index_ratio_f32= 0.884324 build_s= 2637.624813 compress_s= 2722.824536
+Gorilla chain= -1 data_ratio_f32= 0.883507 index_ratio_f32= 0.885795 build_s= 2637.624813 compress_s= 962.817533
+Elf chain= 2 data_ratio_f32= 0.816870 index_ratio_f32= 0.820200 build_s= 2637.624813 compress_s= 1011.063671
+Elf chain= 4 data_ratio_f32= 0.927025 index_ratio_f32= 0.928527 build_s= 2637.624813 compress_s= 33878.816343
+Elf chain= 8 data_ratio_f32= 0.935466 index_ratio_f32= 0.936807 build_s= 2637.624813 compress_s= 2984.232998
+Elf chain= -1 data_ratio_f32= 0.936105 index_ratio_f32= 0.937433 build_s= 2637.624813 compress_s= 1232.638668
+
+Vamana compression (baseline: F32):
+forest nodes=1000000 dim=960 roots=10000 fallback=0 rounds=9 max_depth=1 average_depth=0.99 mean_reference_l2=1.18137
+raw graph_bytes=87574448 data_bytes=3840000032
+dexor roots=10000 fallback=0 patches=72282 payload_bytes=6398388233 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.6002 data_file_ratio=0.5982 full_index_ratio=0.6036 build_seconds=562.6739
+gorilla roots=10000 fallback=0 patches=0 payload_bytes=7911040642 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.4854 data_file_ratio=0.4841 full_index_ratio=0.4897 build_seconds=175.2610
+elf roots=10000 fallback=0 patches=0 payload_bytes=4708767611 metadata_bytes=21000032 graph_bytes=87574448 payload_ratio=0.8155 data_file_ratio=0.8119 full_index_ratio=0.8153 build_seconds=155.1564
+Wrote 118 retrieval rows to /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/gist-960-euclidean/retrieval_ch2.csv
+Cross-graph results: /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/gist-960-euclidean
+Cross-graph transfer: deep-image-96-angular
+Cross-graph input shapes: {'train.fvecs': (9990000, 96), 'test.fvecs': (10000, 96), 'neighbors.ivecs': (10000, 100)}
+Unit-normalized F32 train/query inputs: /home/zmy/compressedDiskANN/build/data/cross_graph_transfer/deep-image-96-angular/normalized_inputs
+[100%] Built target fvecs_to_bin
+[100%] Built target ivecs_to_bin
+[ 90%] Built target diskann
+[100%] Built target build_memory_index
+[ 90%] Built target diskann
+[100%] Built target search_memory_index
+[100%] Built target convert_lvc_vamana
+[100%] Built target verify_lvc_vamana
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Configuring done (0.2s)
+-- Generating done (0.8s)
+-- Build files have been written to: /home/zmy/HNSWCW/compressedhnsw/build_lvc_sift
+[100%] Built target test_build_compressed_hnsw_ablation
+[100%] Built target test_search_compressed_hnsw_ablation
+Converting cross-graph inputs to DiskANN bin format
+Dataset: #pts = 9990000, # dims = 96
+# blks: 77
+Block #0 written
+Block #1 written
+Block #2 written
+Block #3 written
+Block #4 written
+Block #5 written
+Block #6 written
+Block #7 written
+Block #8 written
+Block #9 written
+Block #10 written
+Block #11 written
+Block #12 written
+Block #13 written
+Block #14 written
+Block #15 written
+Block #16 written
+Block #17 written
+Block #18 written
+Block #19 written
+Block #20 written
+Block #21 written
+Block #22 written
+Block #23 written
+Block #24 written
+Block #25 written
+Block #26 written
+Block #27 written
+Block #28 written
+Block #29 written
+Block #30 written
+Block #31 written
+Block #32 written
+Block #33 written
+Block #34 written
+Block #35 written
+Block #36 written
+Block #37 written
+Block #38 written
+Block #39 written
+Block #40 written
+Block #41 written
+Block #42 written
+Block #43 written
+Block #44 written
+Block #45 written
+Block #46 written
+Block #47 written
+Block #48 written
+Block #49 written
+Block #50 written
+Block #51 written
+Block #52 written
+Block #53 written
+Block #54 written
+Block #55 written
+Block #56 written
+Block #57 written
+Block #58 written
+Block #59 written
+Block #60 written
+Block #61 written
+Block #62 written
+Block #63 written
+Block #64 written
+Block #65 written
+Block #66 written
+Block #67 written
+Block #68 written
+Block #69 written
+Block #70 written
+Block #71 written
+Block #72 written
+Block #73 written
+Block #74 written
+Block #75 written
+Block #76 written
+Dataset: #pts = 10000, # dims = 96
+# blks: 1
+Block #0 written
+Dataset: #pts = 10000, # dims = 100
+# blks: 1
+Block #0 written
+Converted train.fvecs: n=9990000 dim=96 bytes=3836160008
+Converted test.fvecs: n=10000 dim=96 bytes=3840008
+Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
+Building and searching HNSW indexes
