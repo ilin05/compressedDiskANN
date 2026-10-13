@@ -379,3 +379,5 @@ gperftools
 
 # Rust
 rust/target
+
+scripts/**/*.bin
