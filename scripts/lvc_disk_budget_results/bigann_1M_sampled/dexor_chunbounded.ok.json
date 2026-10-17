@@ -1,0 +1,75 @@
+{
+  "signature": {
+    "binary": [
+      "/home/zmy/compressedDiskANN/build/apps/search_disk_index",
+      1792231669961890970
+    ],
+    "disk": [
+      "/home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1M_R32_L50_A1.2_disk.index",
+      682672128,
+      1776178539774123157
+    ],
+    "pq": [
+      "/home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1M_R32_L50_A1.2_pq_compressed.bin",
+      32000008,
+      1776178556978967538
+    ],
+    "pivots": [
+      "/home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1M_R32_L50_A1.2_pq_pivots.bin",
+      135836,
+      1776180078825339613
+    ],
+    "query": [
+      "/home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin",
+      5120008,
+      1776180076332355051
+    ],
+    "gt": [
+      "/home/zmy/compressedDiskANN/build/data/bigann/bigann_1M_gt.bin",
+      80000008,
+      1776180077539347576
+    ],
+    "sample_nodes": 1000,
+    "state_ratio": 0.01,
+    "codec": "dexor",
+    "chain": -1,
+    "hard": 33554432,
+    "target": 32505856,
+    "L": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      10
+    ],
+    "k": 1,
+    "rounds": 1,
+    "threads": 1,
+    "beam": 1,
+    "verify": true
+  },
+  "actual": {
+    "nodes": 60096,
+    "graph_bytes": 15272704,
+    "graph_lookup_bytes": 7340032,
+    "vector_payload_bytes": 11272969,
+    "vector_metadata_bytes": 1442304,
+    "total_bytes": 32029729,
+    "limit_bytes": 33554432,
+    "state_cache_bytes": 4041752,
+    "includes_state": 1,
+    "nhood_buckets": 131072,
+    "coord_buckets": 131072
+  },
+  "nodes": 60096,
+  "forest": {
+    "chain_max": "-1",
+    "roots": "600",
+    "max_depth": "25",
+    "average_depth": "4.56145",
+    "forest_hash": "15488187216259766302"
+  }
+}

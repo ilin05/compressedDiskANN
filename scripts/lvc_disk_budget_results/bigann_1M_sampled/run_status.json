@@ -1,0 +1,8 @@
+{
+  "status": "complete",
+  "cases": 8,
+  "sample_nodes": 1000,
+  "hard_budget_bytes": 33554432,
+  "planning_budget_bytes": 32505856,
+  "results_compared_with_raw": true
+}

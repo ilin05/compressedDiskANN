@@ -28,3 +28,15 @@ dexor probe=1 nodes=37953984 bytes=29962891527 utilization=0.872
 dexor probe=2 nodes=51744992 bytes=51790741543 utilization=1.507
 dexor probe=3 nodes=44849488 bytes=49470370710 utilization=1.440
 dexor probe=4 nodes=41401736 bytes=48305948813 utilization=1.406
+Traceback (most recent call last):
+  File "/home/zmy/compressedDiskANN/scripts/lvc_disk_memory_budget.py", line 248, in <module>
+    main()
+  File "/home/zmy/compressedDiskANN/scripts/lvc_disk_memory_budget.py", line 188, in main
+    current = measure(mid)
+              ^^^^^^^^^^^^
+  File "/home/zmy/compressedDiskANN/scripts/lvc_disk_memory_budget.py", line 148, in measure
+    stats = run(codec, nodes, f"probe_{nodes}", probe=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zmy/compressedDiskANN/scripts/lvc_disk_memory_budget.py", line 117, in run
+    raise RuntimeError(f"{codec} {phase} failed; see {log}")
+RuntimeError: dexor probe_39677860 failed; see /home/zmy/compressedDiskANN/scripts/lvc_disk_budget_results/bigann_1B/dexor_probe_39677860.log
