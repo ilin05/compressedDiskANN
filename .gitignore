@@ -378,3 +378,7 @@ gperftools
 
 # Rust
 rust/target
+
+# Compression-only DiskANN experiment: retain CSV summaries, exclude large outputs.
+scripts/alp_only_results/**/*.bin
+scripts/alp_only_results/**/*.log

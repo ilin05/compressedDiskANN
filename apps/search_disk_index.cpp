@@ -4,6 +4,7 @@
 #include "common_includes.h"
 #include <boost/program_options.hpp>
 #include <fstream>
+#include <chrono>
 
 #include "index.h"
 #include "disk_utils.h"
@@ -68,7 +69,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const uint32_t num_nodes_to_cache, const uint32_t search_io_limit,
                       const std::vector<uint32_t> &Lvec, const float fail_if_recall_below,
                       const std::vector<std::string> &query_filters, const bool use_reorder_data = false,
-                      const uint32_t num_rounds = 1)
+                      const uint32_t num_rounds = 1, const bool alp_cache = false, const bool verify_cache = false)
 {
     struct SearchCsvRow
     {
@@ -150,6 +151,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         return res;
     }
 
+    _pFlashIndex->set_alp_cache(alp_cache, verify_cache);
+    const auto cache_load_start = std::chrono::steady_clock::now();
     // 用 bfs 算法确定要 aching 的节点列表，优先缓存距离 medoid(s) 较近的节点
     std::vector<uint32_t> node_list;
     diskann::cout << "Caching " << num_nodes_to_cache << " nodes around medoid(s)" << std::endl;
@@ -157,7 +160,18 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     // if (num_nodes_to_cache > 0)
     //     _pFlashIndex->generate_cache_list_from_sample_queries(warmup_query_file, 15, 6, num_nodes_to_cache,
     //     num_threads, node_list);
+    uint64_t cache_list_hash = 1469598103934665603ULL;
+    for (uint32_t id : node_list) { cache_list_hash ^= id; cache_list_hash *= 1099511628211ULL; }
+    diskann::cout << "Cache node list: count=" << node_list.size() << " hash=" << cache_list_hash << std::endl;
     _pFlashIndex->load_cache_list(node_list);
+    const double cache_load_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - cache_load_start).count();
+    const auto cache_stats = _pFlashIndex->get_cache_payload_stats();
+    diskann::cout << "CACHE_PAYLOAD codec=" << (alp_cache ? "alp" : "raw") << " nodes=" << cache_stats.nodes
+                  << " raw_bytes=" << cache_stats.raw_bytes << " payload_bytes=" << cache_stats.payload_bytes
+                  << " offset_value_bytes=" << cache_stats.metadata_bytes
+                  << " load_seconds=" << cache_load_seconds << std::endl;
+
     const size_t rss_after_cache_load_kb = get_peak_rss_kb();
     diskann::cout << "Peak RSS after cache load: " << rss_after_cache_load_kb << " KB" << std::endl;
     node_list.clear();
@@ -379,17 +393,15 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                                         rss_after_cache_load_kb, rss_after_search_kb, calc_recall_flag});
     }
 
-    // const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
-    //                                     std::to_string(num_threads) + "_search_result.csv";
-    const std::string csv_result_path = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
-                                        std::to_string(num_threads) + "_C" + std::to_string(num_nodes_to_cache) +
-                                        "_search_result.csv";
+    // Keep Raw/ALP and different runs separate using the caller's result prefix.
+    const std::string csv_result_path = result_output_prefix + "_search_summary.csv";
     std::ofstream csv_out(csv_result_path);
     if (csv_out.is_open())
     {
         csv_out << "L,Beamwidth,Num_Nodes_To_Cache,RSS_After_Cache_Load(KB),RSS_After_Search(KB),"
                 << "QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@"
-                << recall_at << "\n";
+                << recall_at << ",CacheCodec,ActualCachedNodes,CacheListHash,RawPayloadBytes,CachePayloadBytes,"
+                << "OffsetValueBytes,PayloadRatio,PayloadAndOffsetsRatio,CacheLoadSeconds\n";
         csv_out.setf(std::ios::fixed, std::ios::floatfield);
         csv_out.precision(6);
         for (const auto &row : csv_rows)
@@ -400,7 +412,24 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                     << row.mean_io_us << ',' << row.mean_cpu_us << ',';
             if (row.has_recall)
                 csv_out << row.recall;
-            csv_out << "\n";
+            const double ratio = cache_stats.payload_bytes ?
+                double(cache_stats.raw_bytes) / cache_stats.payload_bytes : 0;
+            const double total_ratio = cache_stats.payload_bytes + cache_stats.metadata_bytes ?
+                double(cache_stats.raw_bytes) / (cache_stats.payload_bytes + cache_stats.metadata_bytes) : 0;
+            csv_out << ',' << (alp_cache ? "alp" : "raw") << ',' << cache_stats.nodes << ',' << cache_list_hash
+                    << ',' << cache_stats.raw_bytes << ',' << cache_stats.payload_bytes << ',' << cache_stats.metadata_bytes
+                    << ',' << ratio << ',' << total_ratio << ',' << cache_load_seconds << "\n";
+        }
+        csv_out.close();
+        // Preserve the original Raw CSV path for existing test_bigann scripts.
+        if (!alp_cache) {
+            const std::string legacy = index_path_prefix + "_K" + std::to_string(recall_at) + "_T" +
+                std::to_string(num_threads) + "_C" + std::to_string(num_nodes_to_cache) + "_search_result.csv";
+            if (legacy != csv_result_path) {
+                std::ifstream source(csv_result_path, std::ios::binary);
+                std::ofstream target(legacy, std::ios::binary);
+                if (source && target) target << source.rdbuf();
+            }
         }
         diskann::cout << "Saved search summary CSV to " << csv_result_path << std::endl;
     }
@@ -435,7 +464,8 @@ int main(int argc, char **argv)
         label_type, query_filters_file;
     uint32_t num_threads, K, W, num_nodes_to_cache, search_io_limit, num_rounds;
     std::vector<uint32_t> Lvec;
-    bool use_reorder_data = false;
+    bool use_reorder_data = false, verify_cache = false;
+    std::string cache_codec = "raw";
     float fail_if_recall_below = 0.0f;
 
     po::options_description desc{
@@ -468,6 +498,10 @@ int main(int argc, char **argv)
                                        program_options_utils::GROUND_TRUTH_FILE_DESCRIPTION);
         optional_configs.add_options()("beamwidth,W", po::value<uint32_t>(&W)->default_value(2),
                                        program_options_utils::BEAMWIDTH);
+        optional_configs.add_options()("cache_codec", po::value<std::string>(&cache_codec)->default_value("raw"),
+                                       "RAM vector payload codec: raw or alp (original batch/libaio search)");
+        optional_configs.add_options()("verify_cache", po::bool_switch(&verify_cache),
+                                       "Verify every ALP cached vector bitwise when loading");
         optional_configs.add_options()("num_nodes_to_cache", po::value<uint32_t>(&num_nodes_to_cache)->default_value(0),
                                        program_options_utils::NUMBER_OF_NODES_TO_CACHE);
         optional_configs.add_options()(
@@ -515,6 +549,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    if (cache_codec != "raw" && cache_codec != "alp") {
+        std::cerr << "cache_codec must be raw or alp" << std::endl;
+        return -1;
+    }
+    if (verify_cache && cache_codec != "alp") {
+        std::cerr << "verify_cache requires cache_codec=alp" << std::endl;
+        return -1;
+    }
     diskann::Metric metric;
     if (dist_fn == std::string("mips"))
     {
@@ -573,15 +615,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -593,15 +635,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_codec == "alp", verify_cache);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;

@@ -46,6 +46,14 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 
     DISKANN_DLLEXPORT void load_cache_list(std::vector<uint32_t> &node_list);
 
+    // Compression-only ablation: original traversal and I/O are retained.
+    DISKANN_DLLEXPORT void set_alp_cache(bool enabled, bool verify = false);
+    struct CachePayloadStats {
+        uint64_t nodes = 0, raw_bytes = 0, payload_bytes = 0, metadata_bytes = 0;
+    };
+    CachePayloadStats get_cache_payload_stats() const { return _cache_payload_stats; }
+
+
 #ifdef EXEC_ENV_OLS
     DISKANN_DLLEXPORT void generate_cache_list_from_sample_queries(MemoryMappedFiles &files, std::string sample_bin,
                                                                    uint64_t l_search, uint64_t beamwidth,
@@ -212,6 +220,12 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     // coord_cache; The T* in coord_cache are offsets into coord_cache_buf
     T *_coord_cache_buf = nullptr;
     tsl::robin_map<uint32_t, T *> _coord_cache;
+    bool _alp_cache = false, _verify_alp_cache = false;
+    std::vector<uint8_t> _alp_cache_bytes;
+    tsl::robin_map<uint32_t, size_t> _alp_cache_offsets;
+    CachePayloadStats _cache_payload_stats;
+    void load_alp_cache_list(const std::vector<uint32_t> &node_list);
+
 
     // thread-specific scratch
     ConcurrentQueue<SSDThreadData<T> *> _thread_data;

@@ -7,6 +7,8 @@
 #include "pq.h"
 #include "pq_scratch.h"
 #include "pq_flash_index.h"
+#include "alp_cache_codec.h"
+#include <iomanip>
 #include "cosine_similarity.h"
 
 #ifdef _WINDOWS
@@ -204,8 +206,73 @@ std::vector<bool> PQFlashIndex<T, LabelT>::read_nodes(const std::vector<uint32_t
     return retval;
 }
 
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_alp_cache(bool enabled, bool verify)
+{
+    if (!_nhood_cache.empty()) throw std::logic_error("Set cache codec before loading cached nodes");
+    if (enabled && (!std::is_same_v<T, float> || metric != diskann::Metric::L2 || _use_disk_index_pq))
+        throw std::invalid_argument("ALP-only cache requires F32/L2 and full-precision SSD vectors");
+    _alp_cache = enabled;
+    _verify_alp_cache = verify;
+}
+
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::load_alp_cache_list(const std::vector<uint32_t> &node_list)
+{
+    if (!std::is_same_v<T, float> || metric != diskann::Metric::L2 || _use_disk_index_pq)
+        throw std::invalid_argument("ALP-only cache requires F32/L2 and full-precision SSD vectors");
+    if (_nhood_cache_buf != nullptr) throw std::logic_error("Cache already loaded");
+    const size_t count = node_list.size();
+    diskann::cout << "Loading ALP-only cache: nodes=" << count << std::endl;
+    _nhood_cache_buf = new uint32_t[count * (_max_degree + 1)];
+    const size_t block_size = 8;
+    std::vector<T> coordinates(block_size * _aligned_dim), decoded(_aligned_dim);
+    uint64_t verified = 0;
+    for (size_t start = 0; start < count; start += block_size)
+    {
+        const size_t end = (std::min)(count, start + block_size);
+        std::vector<uint32_t> ids(node_list.begin() + start, node_list.begin() + end);
+        std::vector<T *> buffers;
+        std::vector<std::pair<uint32_t, uint32_t *>> neighbors;
+        for (size_t i = start; i < end; ++i) {
+            buffers.push_back(coordinates.data() + (i - start) * _aligned_dim);
+            neighbors.emplace_back(0, _nhood_cache_buf + i * (_max_degree + 1));
+        }
+        auto status = read_nodes(ids, buffers, neighbors);
+        for (size_t i = 0; i < ids.size(); ++i) {
+            if (!status[i]) throw std::runtime_error("Could not read ALP cache node " + std::to_string(ids[i]));
+            std::vector<uint8_t> record;
+            alp_only::flash_encode_and_store(buffers[i], _data_dim, record);
+            if (_verify_alp_cache) {
+                alp_only::flash_decode_vector(record.data(), _data_dim, _aligned_dim, decoded.data());
+                for (size_t j = 0; j < _data_dim; ++j) {
+                    if (std::memcmp(buffers[i] + j, decoded.data() + j, sizeof(T)) != 0) {
+                        diskann::cerr << std::setprecision(17) << "ALP verification FAIL node=" << ids[i]
+                            << " coordinate=" << j << " expected=" << buffers[i][j]
+                            << " decoded=" << decoded[j] << std::endl;
+                        throw std::runtime_error("ALP cache is not bitwise lossless for this input");
+                    }
+                }
+                ++verified;
+            }
+            _alp_cache_offsets.emplace(ids[i], _alp_cache_bytes.size());
+            for (uint8_t byte : record) _alp_cache_bytes.push_back(byte);
+            _nhood_cache.emplace(ids[i], neighbors[i]);
+        }
+    }
+    _alp_cache_bytes.shrink_to_fit();
+    _cache_payload_stats = {count, count * _data_dim * sizeof(T), _alp_cache_bytes.size(),
+                           count * sizeof(size_t)};
+    diskann::cout << "ALP-only cache nodes=" << count << " raw_bytes=" << _cache_payload_stats.raw_bytes
+                  << " payload_bytes=" << _cache_payload_stats.payload_bytes
+                  << " offset_value_bytes=" << _cache_payload_stats.metadata_bytes << std::endl;
+    if (_verify_alp_cache)
+        diskann::cout << "PASS ALP cache bitwise vectors=" << verified << '/' << count << std::endl;
+}
+
 template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_list(std::vector<uint32_t> &node_list)
 {
+    if (_alp_cache) { load_alp_cache_list(node_list); return; }
     diskann::cout << "Loading the cache list into memory.." << std::flush;
     size_t num_cached_nodes = node_list.size();
 
@@ -252,6 +319,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
             }
         }
     }
+    _cache_payload_stats = {_nhood_cache.size(), num_cached_nodes * _data_dim * sizeof(T),
+                            num_cached_nodes * _aligned_dim * sizeof(T), 0};
     diskann::cout << "..done." << std::endl;
 }
 
@@ -359,11 +428,11 @@ void PQFlashIndex<T, LabelT>::cache_bfs_levels(uint64_t num_nodes_to_cache, std:
     tsl::robin_set<uint32_t> node_set;
 
     // Do not cache more than 10% of the nodes in the index
-    uint64_t tenp_nodes = (uint64_t)(std::round(this->_num_points * 0.1));
+    uint64_t tenp_nodes = (uint64_t)(std::round(this->_num_points * (_alp_cache ? 0.5 : 0.1)));
     if (num_nodes_to_cache > tenp_nodes)
     {
         diskann::cout << "Reducing nodes to cache from: " << num_nodes_to_cache << " to: " << tenp_nodes
-                      << "(10 percent of total nodes:" << this->_num_points << ")" << std::endl;
+                      << (_alp_cache ? "(50 percent of total nodes:" : "(10 percent of total nodes:") << this->_num_points << ")" << std::endl;
         num_nodes_to_cache = tenp_nodes == 0 ? 1 : tenp_nodes;
     }
     diskann::cout << "Caching " << num_nodes_to_cache << "..." << std::endl;
@@ -1488,8 +1557,15 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         // process cached nhoods
         for (auto &cached_nhood : cached_nhoods)
         {
-            auto global_cache_iter = _coord_cache.find(cached_nhood.first);
-            T *node_fp_coords_copy = global_cache_iter->second;
+            const T *node_fp_coords_copy;
+            if (_alp_cache) {
+                const size_t offset = _alp_cache_offsets.at(cached_nhood.first);
+                alp_only::flash_decode_vector(_alp_cache_bytes.data() + offset, _data_dim, _aligned_dim, data_buf);
+                node_fp_coords_copy = data_buf;
+            } else {
+                auto global_cache_iter = _coord_cache.find(cached_nhood.first);
+                node_fp_coords_copy = global_cache_iter->second;
+            }
             float cur_expanded_dist;
             if (!_use_disk_index_pq)
             {
