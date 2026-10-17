@@ -53,13 +53,20 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
         uint64_t graph_lookup_bytes = 0;
         uint64_t vector_payload_bytes = 0;
         uint64_t vector_metadata_bytes = 0;
-        uint64_t total_bytes() const { return graph_bytes + vector_payload_bytes + vector_metadata_bytes; }
+        uint64_t state_cache_bytes = 0;
+        uint64_t nhood_buckets = 0, coord_buckets = 0;
+        uint64_t total_bytes(bool include_state = false) const {
+            return graph_bytes + vector_payload_bytes + vector_metadata_bytes + (include_state ? state_cache_bytes : 0);
+        }
     };
     DISKANN_DLLEXPORT CacheBudgetStats get_cache_budget_stats() const;
 
     // 0=ALP (existing default), 1=Raw F32, 2=DeXOR, 3=Gorilla, 4=Elf.
     DISKANN_DLLEXPORT void set_cache_payload_mode(uint32_t mode, bool verify = false);
     DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio);
+    DISKANN_DLLEXPORT void set_lvc_chain_max(int chain_max);
+    DISKANN_DLLEXPORT void sample_cache_budget(const std::vector<uint32_t> &nodes, const std::string &csv_path);
+
 
 #ifdef EXEC_ENV_OLS
     DISKANN_DLLEXPORT void generate_cache_list_from_sample_queries(MemoryMappedFiles &files, std::string sample_bin,
@@ -230,6 +237,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     uint32_t _cache_payload_mode = 0;
     bool _verify_cache_payload = false;
     float _lvc_state_cache_ratio = 0.01f;
+    int _lvc_chain_max = 2;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>> _dexor_cache;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>> _gorilla_cache;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>> _elf_cache;

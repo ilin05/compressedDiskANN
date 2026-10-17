@@ -381,3 +381,7 @@ gperftools
 rust/target
 
 scripts/**/*.bin
+
+# Sampled-budget experiment artifacts: keep statistics, omit large search bins/logs.
+scripts/lvc_disk_budget_results/*_sampled/*.bin
+scripts/lvc_disk_budget_results/*_sampled/*.log

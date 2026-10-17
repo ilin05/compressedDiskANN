@@ -8,6 +8,8 @@
 #include "pq_scratch.h"
 #include "pq_flash_index.h"
 #include "cosine_similarity.h"
+#include <fstream>
+#include <iomanip>
 
 #ifdef _WINDOWS
 #include "windows_aligned_file_reader.h"
@@ -36,10 +38,9 @@ namespace
                                      float *output, uint64_t &records, bool &cache_hit)
     {
         thread_local std::vector<typename Codec::StateType> states;
-        const uint32_t root = store.forest.parent[id];
-        cache_hit = cache != nullptr && cache->find(root == lvc::no_parent ? id : root) != nullptr;
-        store.decode(id, output, states, cache, &records);
-        return records == 0 ? 0 : store.lengths[id] + (records == 2 ? store.lengths[root] : 0);
+        uint64_t bytes = 0;
+        store.decode(id, output, states, cache, &records, &bytes, &cache_hit);
+        return bytes;
     }
 
     struct FlashBitWriter {
@@ -379,6 +380,160 @@ void PQFlashIndex<T, LabelT>::set_cache_payload_mode(uint32_t mode, bool verify)
 }
 
 template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &nodes, const std::string &csv_path)
+{
+    if constexpr (!std::is_same_v<T, float>) {
+        throw std::runtime_error("Cache sampling requires float");
+    } else {
+        if (metric != diskann::Metric::L2 || _use_disk_index_pq || nodes.empty())
+            throw std::runtime_error("Cache sampling requires F32/L2/full-precision SSD and nonempty nodes");
+        Timer total_timer;
+        const uint32_t count = static_cast<uint32_t>(nodes.size());
+        std::vector<float> values(size_t(count) * _data_dim), block(8 * _aligned_dim);
+        std::vector<uint32_t> neighbor_storage(size_t(count) * (_max_degree + 1));
+        std::vector<std::vector<uint32_t>> neighbors(count);
+        tsl::robin_map<uint32_t, uint32_t> local;
+        for (uint32_t i = 0; i < count; ++i)
+            if (!local.emplace(nodes[i], i).second) throw std::runtime_error("Duplicate sample node");
+        diskann::cout << "SAMPLE loading nodes=" << count << std::endl;
+        for (size_t start = 0; start < count; start += 8) {
+            const size_t end = std::min<size_t>(count, start + 8);
+            std::vector<uint32_t> ids(nodes.begin() + start, nodes.begin() + end);
+            std::vector<T*> buffers;
+            std::vector<std::pair<uint32_t, uint32_t*>> nhoods;
+            for (size_t i = start; i < end; ++i) {
+                buffers.push_back(block.data() + (i - start) * _aligned_dim);
+                nhoods.emplace_back(0, neighbor_storage.data() + i * (_max_degree + 1));
+            }
+            const auto status = read_nodes(ids, buffers, nhoods);
+            for (size_t i = 0; i < ids.size(); ++i) {
+                if (!status[i]) throw std::runtime_error("Sample cache read failed");
+                std::copy(buffers[i], buffers[i] + _data_dim, values.begin() + (start + i) * _data_dim);
+                for (uint32_t j = 0; j < nhoods[i].first; ++j) {
+                    const auto found = local.find(nhoods[i].second[j]);
+                    if (found != local.end()) neighbors[start + i].push_back(found->second);
+                }
+            }
+        }
+        decltype(_nhood_cache) nhood_layout;
+        decltype(_coord_cache) coord_layout;
+        for (uint32_t id : nodes) {
+            nhood_layout.emplace(id, std::make_pair(0u, static_cast<uint32_t*>(nullptr)));
+            coord_layout.emplace(id, size_t(0));
+        }
+        const size_t nhood_sample_buckets = nhood_layout.bucket_count(), coord_sample_buckets = coord_layout.bucket_count();
+        nhood_layout.clear(); nhood_layout.rehash(0);
+        coord_layout.clear(); coord_layout.rehash(0);
+        const double load_s = total_timer.elapsed() * 1e-6;
+        neighbor_storage.clear(); neighbor_storage.shrink_to_fit();
+        local.clear(); local.rehash(0);
+        auto vector = [&](uint32_t id) { return values.data() + size_t(id) * _data_dim; };
+        std::ofstream csv(csv_path);
+        if (!csv) throw std::runtime_error("Cannot open sample CSV: " + csv_path);
+        csv << "codec,chain_max,nodes,dim,payload_bytes,record_metadata_bytes,state_cache_bytes,state_cache_payload_bytes,"
+               "adjacency_bytes_per_node,nhood_bucket_bytes,coord_bucket_bytes,nhood_max_load,coord_max_load,"
+               "nhood_sample_buckets,coord_sample_buckets,roots,max_depth,average_depth,mean_reference_l2,forest_hash,load_seconds,forest_seconds,encode_seconds,state_seconds,verified_vectors\n";
+        csv << std::setprecision(12);
+        const auto emit = [&](const std::string &codec, int chain, uint64_t payload, uint64_t metadata,
+                              uint64_t state, uint64_t state_payload, uint32_t roots, uint32_t max_depth,
+                              double avg_depth, double ref, uint64_t hash, double forest_s, double encode_s,
+                              double state_s, size_t verified) {
+            csv << codec << ',' << chain << ',' << count << ',' << _data_dim << ',' << payload << ',' << metadata << ','
+                << state << ',' << state_payload << ',' << (_max_degree + 1) * sizeof(uint32_t) << ','
+                << sizeof(tsl::detail_robin_hash::bucket_entry<typename decltype(_nhood_cache)::value_type, false>) << ','
+                << sizeof(tsl::detail_robin_hash::bucket_entry<typename decltype(_coord_cache)::value_type, false>) << ','
+                << _nhood_cache.max_load_factor() << ',' << _coord_cache.max_load_factor() << ','
+                << nhood_sample_buckets << ',' << coord_sample_buckets << ',' << roots << ',' << max_depth << ',' << avg_depth << ',' << ref << ',' << hash << ','
+                << load_s << ',' << forest_s << ',' << encode_s << ',' << state_s << ',' << verified << '\n';
+            csv.flush();
+            diskann::cout << "SAMPLE codec=" << codec << " chain=" << chain << " payload=" << payload
+                          << " metadata=" << metadata << " state=" << state << std::endl;
+        };
+        emit("raw", 0, uint64_t(count) * _data_dim * sizeof(float), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        Timer encode_timer;
+        uint64_t alp_bytes = 0;
+        for (uint32_t id = 0; id < count; ++id) {
+            std::vector<uint8_t> bytes;
+            flash_encode_and_store(vector(id), _data_dim, bytes);
+            alp_bytes += bytes.size();
+        }
+        emit("alp", 0, alp_bytes, 0, 0, 0, 0, 0, 0, 0, 0, 0, encode_timer.elapsed() * 1e-6, 0, 0);
+        for (int chain : {2, -1}) {
+            diskann::cout << "SAMPLE forest begin chain=" << chain << std::endl;
+            Timer forest_timer;
+            const auto forest = lvc::build_forest(count, _data_dim,
+                [&](uint32_t id) -> const std::vector<uint32_t>& { return neighbors[id]; }, vector, chain);
+            const double forest_s = forest_timer.elapsed() * 1e-6;
+            uint64_t sum_depth = 0, hash = 1469598103934665603ULL;
+            uint32_t max_depth = 0;
+            double reference_sum = 0;
+            std::vector<uint32_t> roots;
+            for (uint32_t id = 0; id < count; ++id) {
+                sum_depth += forest.depth[id]; max_depth = std::max(max_depth, forest.depth[id]);
+                hash = (hash ^ forest.parent[id]) * 1099511628211ULL;
+                if (forest.parent[id] == lvc::no_parent) roots.push_back(id);
+                else {
+                    double squared = 0;
+                    for (size_t j = 0; j < _data_dim; ++j) {
+                        const double delta = double(vector(id)[j]) - vector(forest.parent[id])[j];
+                        squared += delta * delta;
+                    }
+                    reference_sum += std::sqrt(squared);
+                }
+            }
+            std::sort(roots.begin(), roots.end(), [&](uint32_t a, uint32_t b) {
+                return neighbors[a].size() != neighbors[b].size() ? neighbors[a].size() > neighbors[b].size() : a < b;
+            });
+            auto profile = [&](auto policy, const std::string &name) {
+                using Codec = decltype(policy);
+                diskann::cout << "SAMPLE encode begin codec=" << name << " chain=" << chain << std::endl;
+                Timer timer;
+                auto store = lvc::RecordStore<Codec>::build(forest, _data_dim, vector);
+                store.bytes.shrink_to_fit();
+                const double encode_s = timer.elapsed() * 1e-6;
+                timer.reset();
+                lvc::RootStateCache<Codec> cache;
+                if (_lvc_state_cache_ratio > 0) {
+                    const size_t requested = _lvc_state_cache_ratio == 0.01f ? std::max<size_t>(1, count / 100) :
+                        std::max<size_t>(1, size_t(double(count) * _lvc_state_cache_ratio));
+                    if (requested > roots.size()) throw std::runtime_error("Too many sampled cache roots");
+                    cache.reserve(requested);
+                    for (size_t i = 0; i < requested; ++i) {
+                        const auto id = roots[i];
+                        cache.insert(id, store.bytes.data() + store.offsets[id], store.lengths[id], _data_dim);
+                    }
+                }
+                const double state_s = timer.elapsed() * 1e-6;
+                std::vector<float> decoded(_data_dim);
+                std::vector<typename Codec::StateType> states;
+                const size_t stride = std::max<size_t>(1, count / 4096);
+                size_t verified = 0;
+                for (uint32_t id = 0; id < count; id += stride) {
+                    store.decode(id, decoded.data(), states, &cache);
+                    if (std::memcmp(vector(id), decoded.data(), _data_dim * sizeof(float)) != 0)
+                        throw std::runtime_error("Sample F32 reconstruction mismatch codec=" + name + " id=" + std::to_string(id));
+                    ++verified;
+                }
+                emit(name, chain, store.bytes.capacity(), store.metadata_bytes(), cache.resident_bytes(), cache.payload_bytes(),
+                     roots.size(), max_depth, double(sum_depth) / count,
+                     count > roots.size() ? reference_sum / (count - roots.size()) : 0, hash,
+                     forest_s, encode_s, state_s, verified);
+            };
+            profile(hnswlib::codecs::DeXORCodecPolicy{}, "dexor");
+            profile(hnswlib::codecs::GorillaCodecPolicy{}, "gorilla");
+            profile(hnswlib::codecs::ElfCodecPolicy{}, "elf");
+        }
+    }
+}
+
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_lvc_chain_max(int chain_max)
+{
+    if (chain_max != -1 && chain_max < 2) throw std::invalid_argument("chain_max must be -1 or >= 2");
+    _lvc_chain_max = chain_max;
+}
+
+template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::set_lvc_state_cache_ratio(float ratio)
 {
     if (!std::isfinite(ratio) || ratio < 0.0f || ratio > 0.01f)
@@ -534,11 +689,22 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
             }
         }
         auto vector = [&](uint32_t id) { return raw_vectors.data() + size_t(id) * _data_dim; };
+        diskann::cout << "LVC forest begin nodes=" << cached_ids.size() << " chain=" << _lvc_chain_max << std::endl;
         const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
                                               static_cast<uint32_t>(_data_dim),
                                               [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
-                                              vector);
+                                              vector, _lvc_chain_max);
+        uint64_t depth_sum = 0, max_depth = 0, forest_hash = 1469598103934665603ULL;
+        for (size_t i = 0; i < forest.parent.size(); ++i) {
+            depth_sum += forest.depth[i];
+            max_depth = std::max<uint64_t>(max_depth, forest.depth[i]);
+            forest_hash = (forest_hash ^ forest.parent[i]) * 1099511628211ULL;
+        }
+        diskann::cout << "CACHE_FOREST chain_max=" << _lvc_chain_max << " roots=" << forest.initial_roots
+                      << " max_depth=" << max_depth << " average_depth=" << double(depth_sum) / forest.parent.size()
+                      << " forest_hash=" << forest_hash << std::endl;
         uint64_t payload_bytes = 0, patches = 0;
+        diskann::cout << "LVC encode begin mode=" << _cache_payload_mode << std::endl;
         if (_cache_payload_mode == 2) {
             _dexor_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>>(
                 lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>::build(forest, _data_dim, vector));
@@ -637,13 +803,14 @@ typename PQFlashIndex<T, LabelT>::CacheBudgetStats PQFlashIndex<T, LabelT>::get_
 {
     CacheBudgetStats stats;
     stats.nodes = _coord_cache.size();
+    stats.nhood_buckets = _nhood_cache.bucket_count();
+    stats.coord_buckets = _coord_cache.bucket_count();
     stats.graph_bytes = stats.nodes * (_max_degree + 1) * sizeof(uint32_t);
-    // A conservative bucket estimate includes the stored value and one
-    // uint32 probe-distance/control word, rounded to a 16-byte bucket.
-    const auto bucket_bytes = [](size_t value_bytes) { return (value_bytes + sizeof(uint32_t) + 15) & ~size_t(15); };
+    // With default StoreHash=false, automatic stored hashes are enabled only if
+    // they fit existing padding, so this bucket sizeof matches the actual layout.
     stats.graph_lookup_bytes =
-        _nhood_cache.bucket_count() * bucket_bytes(sizeof(typename decltype(_nhood_cache)::value_type)) +
-        _coord_cache.bucket_count() * bucket_bytes(sizeof(typename decltype(_coord_cache)::value_type));
+        _nhood_cache.bucket_count() * sizeof(tsl::detail_robin_hash::bucket_entry<typename decltype(_nhood_cache)::value_type, false>) +
+        _coord_cache.bucket_count() * sizeof(tsl::detail_robin_hash::bucket_entry<typename decltype(_coord_cache)::value_type, false>);
     stats.graph_bytes += stats.graph_lookup_bytes;
     if (_cache_payload_mode == 2 && _dexor_cache) {
         stats.vector_payload_bytes = _dexor_cache->bytes.capacity();
@@ -654,11 +821,12 @@ typename PQFlashIndex<T, LabelT>::CacheBudgetStats PQFlashIndex<T, LabelT>::get_
     } else {
         stats.vector_payload_bytes = _compressed_coord_cache.capacity();
     }
-    if (_cache_payload_mode >= 2) {
-        // RecordStore keeps two uint64 arrays and the predecessor forest keeps
-        // two uint32 arrays. These stay resident for differential decoding.
-        stats.vector_metadata_bytes = stats.nodes * (2 * sizeof(uint64_t) + 2 * sizeof(uint32_t));
-    }
+    if (_dexor_cache) stats.vector_metadata_bytes = _dexor_cache->metadata_bytes();
+    else if (_gorilla_cache) stats.vector_metadata_bytes = _gorilla_cache->metadata_bytes();
+    else if (_elf_cache) stats.vector_metadata_bytes = _elf_cache->metadata_bytes();
+    if (_dexor_state_cache) stats.state_cache_bytes = _dexor_state_cache->resident_bytes();
+    else if (_gorilla_state_cache) stats.state_cache_bytes = _gorilla_state_cache->resident_bytes();
+    else if (_elf_state_cache) stats.state_cache_bytes = _elf_state_cache->resident_bytes();
     return stats;
 }
 

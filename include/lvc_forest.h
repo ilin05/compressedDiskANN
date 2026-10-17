@@ -53,6 +53,17 @@ template <typename Codec> class RootStateCache {
                                  entries.begin()->second.vector.size() * sizeof(float));
     }
 
+    // Vector allocations plus conservative unordered-map nodes/buckets.
+    // Allocator headers are not included; process RSS is reported separately.
+    size_t resident_bytes() const {
+        size_t bytes = entries.bucket_count() * sizeof(void*);
+        for (const auto &item : entries)
+            bytes += item.second.states.capacity() * sizeof(typename Codec::StateType) +
+                     item.second.vector.capacity() * sizeof(float) +
+                     sizeof(typename decltype(entries)::value_type) + 2 * sizeof(void*);
+        return entries.empty() ? 0 : bytes;
+    }
+
   private:
     std::unordered_map<uint32_t, Entry> entries;
 };
@@ -258,19 +269,27 @@ template <typename Codec> class RecordStore {
         return store;
     }
 
+    size_t metadata_bytes() const {
+        return (offsets.capacity() + lengths.capacity()) * sizeof(uint64_t) +
+               (forest.parent.capacity() + forest.depth.capacity()) * sizeof(uint32_t);
+    }
+
     void decode(uint32_t id, float *output) const {
         std::vector<typename Codec::StateType> states(dim);
         decode(id, output, states);
     }
 
     void decode(uint32_t id, float *output, std::vector<typename Codec::StateType> &states,
-                const RootStateCache<Codec> *cache = nullptr, uint64_t *records = nullptr) const {
+                const RootStateCache<Codec> *cache = nullptr, uint64_t *records = nullptr,
+                uint64_t *bytes_read = nullptr, bool *state_hit = nullptr) const {
         if (id >= forest.parent.size() || output == nullptr) throw std::runtime_error("Invalid LVC decode target");
         std::vector<uint32_t> path;
         for (uint32_t current = id; current != no_parent; current = forest.parent[current])
             path.push_back(current);
         const uint32_t root = path.back();
         const auto *entry = cache == nullptr ? nullptr : cache->find(root);
+        if (state_hit != nullptr) *state_hit = entry != nullptr;
+        if (bytes_read != nullptr) *bytes_read = 0;
         if (path.size() == 1 && entry != nullptr) {
             states = entry->states;
             std::copy(entry->vector.begin(), entry->vector.end(), output);
@@ -281,6 +300,7 @@ template <typename Codec> class RecordStore {
         uint64_t replayed = 0;
         for (auto it = path.rbegin() + (entry != nullptr ? 1 : 0); it != path.rend(); ++it) {
             decode_one(*it, states, output);
+            if (bytes_read != nullptr) *bytes_read += lengths[*it];
             ++replayed;
         }
         if (records != nullptr) *records = replayed;

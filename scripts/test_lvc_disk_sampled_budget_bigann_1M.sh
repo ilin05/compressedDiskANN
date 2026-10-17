@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+build="${BUILD_DIR:-$repo/build}"
+data="${DATA_DIR:-$build/data/bigann}"
+index="${INDEX_PREFIX:-$data/disk_index_bigann_1M_R32_L50_A1.2}"
+query="${QUERY_FILE:-$data/bigann_query.fbin}"
+gt="${GT_FILE:-$data/bigann_1M_gt.bin}"
+out="${OUTPUT_DIR:-$repo/scripts/lvc_disk_budget_results/bigann_1M_sampled}"
+for file in "${index}_disk.index" "${index}_pq_compressed.bin" "${index}_pq_pivots.bin" "$query" "$gt"; do
+    [[ -s "$file" ]] || { echo "Missing input: $file" >&2; exit 1; }
+done
+if [[ "${SKIP_BUILD:-0}" != 1 ]]; then
+    [[ -f "$build/CMakeCache.txt" ]] || cmake -S "$repo" -B "$build" -DCMAKE_BUILD_TYPE=Release
+    cmake --build "$build" --target search_disk_index --parallel "${BUILD_THREADS:-4}"
+fi
+extra=()
+[[ "${RESUME:-1}" != 1 ]] || extra+=(--resume)
+python3 "$repo/scripts/lvc_disk_sampled_budget.py" \
+    --binary "$build/apps/search_disk_index" --index-prefix "$index" --query "$query" --gt "$gt" \
+    --output-dir "$out" --expected-points 1000000 --expected-pq-bytes 32 \
+    --sample-nodes "${SAMPLE_NODES:-1000}" --budget-mib "${BUDGET_MIB:-32}" \
+    --planning-budget-mib "${PLANNING_BUDGET_MIB:-31}" \
+    --threads "${THREADS:-1}" --k 1 --L 1 2 3 4 5 6 8 10 --rounds "${ROUNDS:-1}" \
+    --beamwidth 1 --state-cache-ratio "${STATE_CACHE_RATIO:-0.01}" --chains 2 -1 \
+    --verify-cache --check-results "${extra[@]}"
