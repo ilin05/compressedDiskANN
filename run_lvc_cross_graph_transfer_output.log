@@ -362,3 +362,11 @@ Converted train.fvecs: n=9990000 dim=96 bytes=3836160008
 Converted test.fvecs: n=10000 dim=96 bytes=3840008
 Converted neighbors.ivecs: n=10000 dim=100 bytes=4000008
 Building and searching HNSW indexes
+Building Vamana graph and PQ codes
+Compressing and searching Vamana indexes
+forest nodes=9990000 dim=96 roots=99900 fallback=0 rounds=12 max_depth=1 average_depth=0.99 mean_reference_l2=0.673927
+raw graph_bytes=994076328 data_bytes=3836160032
+dexor roots=99900 fallback=0 patches=62303859 payload_bytes=7592194686 metadata_bytes=209790032 graph_bytes=994076328 payload_ratio=0.5053 data_file_ratio=0.4917 full_index_ratio=0.5491 build_seconds=607.6125
+gorilla roots=99900 fallback=0 patches=0 payload_bytes=7988480416 metadata_bytes=209790032 graph_bytes=994076328 payload_ratio=0.4802 data_file_ratio=0.4679 full_index_ratio=0.5255 build_seconds=174.8170
+elf roots=99900 fallback=0 patches=0 payload_bytes=5516609299 metadata_bytes=209790032 graph_bytes=994076328 payload_ratio=0.6954 data_file_ratio=0.6699 full_index_ratio=0.7187 build_seconds=177.7367
+/home/zmy/compressedDiskANN/scripts/test_lvc_cross_graph_sift.sh: line 212: 1402708 Segmentation fault      "$DISKANN_BUILD_DIR/apps/convert_lvc_vamana" "$graph" "$train" "${prefix}_ch${chain}" --chain_max "$chain" --compression_only > "$OUTPUT_DIR/vamana_compression_ch${chain}.log"

@@ -25,3 +25,6 @@ alp probe=9 nodes=41075755 bytes=27778993546 utilization=0.808
 SELECT alp: nodes=41075755 budget_bytes=27778993546 utilization=0.808; node 41165874 exceeds budget; gap=90119
 dexor probe=0 nodes=65536000 bytes=56363247940 utilization=1.640
 dexor probe=1 nodes=37953984 bytes=29962891527 utilization=0.872
+dexor probe=2 nodes=51744992 bytes=51790741543 utilization=1.507
+dexor probe=3 nodes=44849488 bytes=49470370710 utilization=1.440
+dexor probe=4 nodes=41401736 bytes=48305948813 utilization=1.406
