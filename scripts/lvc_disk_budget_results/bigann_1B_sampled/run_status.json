@@ -1,0 +1,7 @@
+{
+  "status": "running",
+  "sample_nodes": 1000000,
+  "hard_budget_bytes": 34359738368,
+  "planning_budget_bytes": 33285996544,
+  "check_results": false
+}
