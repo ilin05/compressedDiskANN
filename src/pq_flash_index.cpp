@@ -575,6 +575,7 @@ void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, Q
 
 template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_list(std::vector<uint32_t> &node_list)
 {
+    _cache_forest_build_seconds = 0;
     if (_cache_payload_mode != 0 &&
         (!std::is_same_v<T, float> || metric != diskann::Metric::L2 || _use_disk_index_pq)) {
         throw std::runtime_error("Raw/LVC disk cache requires F32/L2 with full-precision SSD vectors");
@@ -690,10 +691,12 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
         auto vector = [&](uint32_t id) { return raw_vectors.data() + size_t(id) * _data_dim; };
         diskann::cout << "LVC forest begin nodes=" << cached_ids.size() << " chain=" << _lvc_chain_max << std::endl;
+        Timer forest_timer;
         const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
                                               static_cast<uint32_t>(_data_dim),
                                               [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
                                               vector, _lvc_chain_max);
+        _cache_forest_build_seconds = forest_timer.elapsed() * 1e-6;
         uint64_t depth_sum = 0, max_depth = 0, forest_hash = 1469598103934665603ULL;
         for (size_t i = 0; i < forest.parent.size(); ++i) {
             depth_sum += forest.depth[i];
@@ -702,7 +705,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
         diskann::cout << "CACHE_FOREST chain_max=" << _lvc_chain_max << " roots=" << forest.initial_roots
                       << " max_depth=" << max_depth << " average_depth=" << double(depth_sum) / forest.parent.size()
-                      << " forest_hash=" << forest_hash << std::endl;
+                      << " forest_hash=" << forest_hash
+                      << " forest_seconds=" << _cache_forest_build_seconds << std::endl;
         uint64_t payload_bytes = 0, patches = 0;
         diskann::cout << "LVC encode begin mode=" << _cache_payload_mode << std::endl;
         if (_cache_payload_mode == 2) {
@@ -803,6 +807,7 @@ typename PQFlashIndex<T, LabelT>::CacheBudgetStats PQFlashIndex<T, LabelT>::get_
 {
     CacheBudgetStats stats;
     stats.nodes = _coord_cache.size();
+    stats.forest_build_seconds = _cache_forest_build_seconds;
     stats.nhood_buckets = _nhood_cache.bucket_count();
     stats.coord_buckets = _coord_cache.bucket_count();
     stats.graph_bytes = stats.nodes * (_max_degree + 1) * sizeof(uint32_t);

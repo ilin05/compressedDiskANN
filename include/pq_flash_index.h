@@ -16,6 +16,7 @@
 #include "lvc_forest.h"
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
+#include "cache_lookup_layout.h"
 
 #define FULL_PRECISION_REORDER_MULTIPLIER 3
 
@@ -55,6 +56,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
         uint64_t vector_metadata_bytes = 0;
         uint64_t state_cache_bytes = 0;
         uint64_t nhood_buckets = 0, coord_buckets = 0;
+        double forest_build_seconds = 0;
         uint64_t total_bytes(bool include_state = false) const {
             return graph_bytes + vector_payload_bytes + vector_metadata_bytes + (include_state ? state_cache_bytes : 0);
         }
@@ -229,15 +231,16 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 
     // nhood_cache; the uint32_t in nhood_Cache are offsets into nhood_cache_buf
     unsigned *_nhood_cache_buf = nullptr;
-    tsl::robin_map<uint32_t, std::pair<uint32_t, uint32_t *>> _nhood_cache;
+    CacheNhoodLookup _nhood_cache;
 
     // coord_cache; We now store compressed coordinates in a flat contiguous byte buffer
     std::vector<uint8_t> _compressed_coord_cache;
-    tsl::robin_map<uint32_t, size_t> _coord_cache; // maps node id to byte offset
+    CacheCoordLookup _coord_cache; // maps node id to byte offset
     uint32_t _cache_payload_mode = 0;
     bool _verify_cache_payload = false;
     float _lvc_state_cache_ratio = 0.01f;
     int _lvc_chain_max = 2;
+    double _cache_forest_build_seconds = 0;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>> _dexor_cache;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>> _gorilla_cache;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>> _elf_cache;

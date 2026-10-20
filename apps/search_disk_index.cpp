@@ -85,7 +85,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const bool verify_cache = false, const float lvc_state_cache_ratio = 0.01f,
                       const uint64_t cache_budget_bytes = 0, const bool cache_budget_probe_only = false,
                       const int lvc_chain_max = 2, const bool cache_budget_include_state = false,
-                      const std::string &cache_budget_sample_csv = "")
+                      const std::string &cache_budget_sample_csv = "",
+                      const std::string &cache_node_ids_file = "")
 {
     struct SearchCsvRow
     {
@@ -162,7 +163,10 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     std::unique_ptr<diskann::PQFlashIndex<T, LabelT>> _pFlashIndex(
         new diskann::PQFlashIndex<T, LabelT>(reader, metric));
 
+    const auto index_load_start = std::chrono::steady_clock::now();
     int res = _pFlashIndex->load(num_threads, index_path_prefix.c_str());
+    const double index_load_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - index_load_start).count();
 
     if (res != 0)
     {
@@ -176,7 +180,15 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     // 用 bfs 算法确定要 aching 的节点列表，优先缓存距离 medoid(s) 较近的节点
     std::vector<uint32_t> node_list;
     diskann::cout << "Caching " << num_nodes_to_cache << " nodes around medoid(s)" << std::endl;
-    _pFlashIndex->cache_bfs_levels(num_nodes_to_cache, node_list);
+    if (cache_node_ids_file.empty())
+        _pFlashIndex->cache_bfs_levels(num_nodes_to_cache, node_list);
+    else {
+        if (num_nodes_to_cache > static_cast<uint64_t>(std::round(_pFlashIndex->get_num_points() * 0.5)))
+            throw std::runtime_error("Cache ID prefix exceeds 50% cache cap");
+        node_list = diskann::read_cache_ids(cache_node_ids_file, num_nodes_to_cache,
+                                           _pFlashIndex->get_num_points());
+        diskann::cout << "Using saved sorted cache ID prefix: " << cache_node_ids_file << std::endl;
+    }
     std::sort(node_list.begin(), node_list.end());
     uint64_t cache_list_hash = 1469598103934665603ULL;
     for (uint32_t id : node_list) {
@@ -192,8 +204,14 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         _pFlashIndex->sample_cache_budget(node_list, cache_budget_sample_csv);
         return 0;
     }
+    const auto cache_data_start = std::chrono::steady_clock::now();
+    const double cache_selection_seconds = std::chrono::duration<double>(cache_data_start - cache_start).count();
     _pFlashIndex->load_cache_list(node_list);
+    const double cache_data_load_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - cache_data_start).count();
     const double cache_load_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - cache_start).count();
+    const double total_load_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - index_load_start).count();
     const auto cache_stats = _pFlashIndex->get_cache_budget_stats();
     diskann::cout << "CACHE_BUDGET nodes=" << cache_stats.nodes
                   << " graph_bytes=" << cache_stats.graph_bytes
@@ -460,7 +478,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         csv_out << "L,Beamwidth,Num_Nodes_To_Cache,RSS_After_Cache_Load(KB),RSS_After_Search(KB),"
                 << "Current_RSS_After_Cache_Load(KB),Current_RSS_After_Search(KB),"
                 << "QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@"
-                << recall_at << ",ActualCachedNodes,CacheBytes,StateCacheBytes,ChainMax,CacheLoadSeconds\n";
+                << recall_at << ",ActualCachedNodes,CacheBytes,StateCacheBytes,ChainMax,CacheLoadSeconds,"
+                << "IndexLoadSeconds,TotalLoadSeconds,CacheSelectionSeconds,CacheDataLoadSeconds,ForestBuildSeconds\n";
         csv_out.setf(std::ios::fixed, std::ios::floatfield);
         csv_out.precision(6);
         for (const auto &row : csv_rows)
@@ -473,7 +492,9 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
             if (row.has_recall)
                 csv_out << row.recall;
             csv_out << ',' << cache_stats.nodes << ',' << cache_stats.total_bytes(cache_budget_include_state)
-                    << ',' << cache_stats.state_cache_bytes << ',' << lvc_chain_max << ',' << cache_load_seconds << "\n";
+                    << ',' << cache_stats.state_cache_bytes << ',' << lvc_chain_max << ',' << cache_load_seconds
+                    << ',' << index_load_seconds << ',' << total_load_seconds << ',' << cache_selection_seconds
+                    << ',' << cache_data_load_seconds << ',' << cache_stats.forest_build_seconds << "\n";
         }
         diskann::cout << "Saved search summary CSV to " << csv_result_path << std::endl;
     }
@@ -514,6 +535,7 @@ int main(int argc, char **argv)
     bool cache_budget_include_state = false;
     int lvc_chain_max = 2;
     std::string cache_budget_sample_csv;
+    std::string cache_node_ids_file;
     uint64_t cache_budget_bytes = 0;
     float lvc_state_cache_ratio = 0.01f;
     std::string cache_codec;
@@ -561,6 +583,8 @@ int main(int argc, char **argv)
                                        "Include decoding state and estimated state-map allocations in the cache cap");
         optional_configs.add_options()("cache_budget_sample_csv", po::value<std::string>(&cache_budget_sample_csv)->default_value(""),
                                        "Load sample nodes once, export all codec/chain byte statistics, then exit");
+        optional_configs.add_options()("cache_node_ids_file", po::value<std::string>(&cache_node_ids_file)->default_value(""),
+                                       "Use the first num_nodes_to_cache sorted IDs from a lookup-probe bin file instead of BFS");
         optional_configs.add_options()("cache_budget_probe_only", po::bool_switch(&cache_budget_probe_only),
                                        "Load the cache, report budget bytes, and exit before query search");
         optional_configs.add_options()("cache_budget_bytes", po::value<uint64_t>(&cache_budget_bytes)->default_value(0),
@@ -681,15 +705,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -701,15 +725,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
