@@ -1,0 +1,8 @@
+{
+  "status": "complete",
+  "failed_cases": [],
+  "nominal_budget_bytes": 20971520,
+  "planning_budget_bytes": 20447232,
+  "budget_definition": "non_pq_non_lookup",
+  "attempts_per_case": 1
+}
