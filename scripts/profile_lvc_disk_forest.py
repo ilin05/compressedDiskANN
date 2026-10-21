@@ -8,7 +8,7 @@ import re
 import struct
 
 from lvc_disk_payload_budget import actual_budget, estimate, select_nodes
-from lvc_disk_sampled_budget import (budget_from_log, csv_rows, run_logged,
+from lvc_disk_sampled_budget import (budget_from_log, csv_rows, forest_from_log, run_logged,
                                      save_csv, save_json, verify_samples)
 
 
@@ -38,11 +38,13 @@ def main():
     parser.add_argument("--planning-budget-mib", type=float, default=19.5)
     parser.add_argument("--expected-points", type=int, default=1000000)
     parser.add_argument("--build-threads", type=int, default=1)
+    parser.add_argument("--chains", type=int, nargs="+", default=[2, -1], choices=[2, -1])
+    parser.add_argument("--fallback-root-candidates", type=int, default=1, choices=[0, 1])
     args = parser.parse_args()
     budget = int(args.budget_mib * 2**20)
     planning = int(args.planning_budget_mib * 2**20)
     if (not 0 < planning <= budget or args.build_threads < 1 or args.expected_points < 2 or
-            not 1 <= args.sample_nodes <= args.expected_points // 2):
+            not 1 <= args.sample_nodes <= args.expected_points // 2 or len(set(args.chains)) != len(args.chains)):
         parser.error("Invalid sample size or budget")
     out = args.output_dir.absolute()
     out.mkdir(parents=True, exist_ok=True)
@@ -55,11 +57,13 @@ def main():
     common = [str(args.binary.absolute()), "--data_type", "float", "--dist_fn", "l2",
               "--index_path_prefix", index, "--query_file", str(args.query.absolute()),
               "--gt_file", "null", "-T", "1", "-K", "1", "-L", "1", "-W", "1", "-R", "1",
-              "--lvc_state_cache_ratio", "0.01", "--lvc_build_threads", str(args.build_threads)]
+              "--lvc_state_cache_ratio", "0.01", "--lvc_build_threads", str(args.build_threads),
+              "--lvc_fallback_root_candidates", str(args.fallback_root_candidates)]
     save_json(out / "config.json", dict(index=index, threads=1, build_threads=args.build_threads,
               expected_points=args.expected_points, budget_bytes=budget,
               planning_budget_bytes=planning, sample_nodes=args.sample_nodes, codec="dexor",
-              chains=[2, -1], query_search=False, verify_cache=True,
+              chains=args.chains, fallback_root_candidates=args.fallback_root_candidates,
+              query_search=False, verify_cache=True,
               budget_definition="adjacency + payload + record metadata + state cache; excludes PQ/node lookups"))
     sample = out / "sample.csv"
     if sample.exists():
@@ -71,9 +75,12 @@ def main():
     if code:
         raise RuntimeError("Sampling failed; see sample.log")
     samples = verify_samples(csv_rows(sample), args.sample_nodes)
+    if any(int(row.get("fallback_root_candidates", -1)) != args.fallback_root_candidates
+           for row in samples.values()):
+        raise ValueError("Sample forest policy mismatch; rebuild search_disk_index")
     rows = []
     failed = False
-    for chain in (2, -1):
+    for chain in args.chains:
         tag = "dexor_ch2" if chain == 2 else "dexor_chunbounded"
         row = samples["dexor", chain]
         nodes = select_nodes(row, planning, points // 2)
@@ -95,6 +102,8 @@ def main():
                 raise ValueError("Timing configuration mismatch")
             if int(timing.get("build_threads", 0)) != args.build_threads:
                 raise ValueError("Build thread configuration mismatch")
+            if int(timing.get("fallback_root_candidates", -1)) != args.fallback_root_candidates:
+                raise ValueError("Production forest policy mismatch")
             stats = budget_from_log(log)
             if not stats or stats["nodes"] != nodes:
                 raise ValueError("Missing or inconsistent cache budget statistics")
@@ -106,8 +115,17 @@ def main():
             record.update(actual_nodes=stats["nodes"], actual_budget_bytes=used,
                           budget_utilization=used / budget, within_budget=used <= budget,
                           verified_vectors=nodes, status="ok" if used <= budget else "over_budget")
+            forest = forest_from_log(log)
+            record.update(payload_bytes=stats["vector_payload_bytes"],
+                          payload_ratio_f32=nodes * int(row["dim"]) * 4 / stats["vector_payload_bytes"],
+                          average_depth=forest.get("average_depth", ""), max_depth=forest.get("max_depth", ""),
+                          forest_hash=forest.get("forest_hash", ""))
             for key, value in timing.items():
                 record[key] = float(value) if key.endswith("seconds") else int(value)
+            if record.get("fallback_root_candidates") == 1 and chain == -1:
+                fallback_count = record["fallback_nodes"]
+                record["fallback_mean_tree_candidates"] = (
+                    record["fallback_tree_distances"] / fallback_count if fallback_count else 0)
             record.update(load_timings(log))
             total = record["forest_seconds"] + record["encode_seconds"]
             for stage in ("root_selection", "propagation", "fallback", "finalize", "encode"):
@@ -125,6 +143,9 @@ def main():
                           "root_selection", "propagation", "fallback", "finalize"):
                 seconds = record[stage + "_seconds"]
                 record[stage + "_load_percent"] = 100 * seconds / load if load else 0
+            for stage in ("fallback_bucket", "fallback_root_search", "fallback_tree_search"):
+                if stage + "_seconds" in record:
+                    record[stage + "_load_percent"] = 100 * record[stage + "_seconds"] / load if load else 0
             print("{}: roots={:.6f}s propagation={:.6f}s fallback={:.6f}s encode={:.6f}s".format(
                 tag, *(record[key + "_seconds"] for key in
                        ("root_selection", "propagation", "fallback", "encode"))), flush=True)

@@ -33,6 +33,11 @@ struct ForestBuildTimings {
     double propagation_seconds = 0;
     double fallback_seconds = 0;
     double finalize_seconds = 0; // Parent materialization and validation.
+    double fallback_bucket_seconds = 0;
+    double fallback_root_search_seconds = 0;
+    double fallback_tree_search_seconds = 0;
+    uint64_t fallback_root_distances = 0, fallback_tree_distances = 0;
+    uint64_t fallback_max_tree_nodes = 0;
 };
 
 struct Forest {
@@ -110,12 +115,106 @@ inline void validate_forest(const Forest &forest) {
     if (roots != forest.initial_roots) throw std::runtime_error("LVC root count changed");
 }
 
+// Root-local fallback for unbounded chains. Only membership in the predecessor
+// tree matters here, not outgoing reachability in the original graph.
+template <typename DistanceFn>
+void assign_root_local_fallback(Forest &forest, std::vector<uint32_t> &root_of,
+                               const std::vector<uint8_t> &is_root,
+                               const std::vector<uint32_t> &unresolved, DistanceFn distance,
+                               int build_threads, ForestBuildTimings *timings) {
+    using Clock = std::chrono::steady_clock;
+    auto start = Clock::now();
+    std::vector<uint32_t> roots, slot(root_of.size(), no_parent);
+    for (uint32_t i = 0; i < root_of.size(); ++i) {
+        if (is_root[i]) { slot[i] = static_cast<uint32_t>(roots.size()); roots.push_back(i); }
+    }
+    std::vector<std::vector<uint32_t>> members(roots.size()), pending(roots.size());
+    for (uint32_t i = 0; i < root_of.size(); ++i)
+        if (root_of[i] != no_parent) members[slot[root_of[i]]].push_back(i);
+    std::vector<uint32_t> nearest_slot(unresolved.size(), no_parent);
+    auto now = Clock::now();
+    double bucket_seconds = std::chrono::duration<double>(now - start).count();
+    start = now;
+    std::exception_ptr failure;
+#pragma omp parallel for num_threads(build_threads) schedule(static) if(build_threads > 1)
+    for (size_t index = 0; index < unresolved.size(); ++index) {
+        try {
+            float best = std::numeric_limits<float>::max();
+            for (uint32_t j = 0; j < roots.size(); ++j) {
+                const float d = distance(unresolved[index], roots[j]);
+                // roots are ascending: exact ties select the smallest root ID.
+                if (d < best) { best = d; nearest_slot[index] = j; }
+            }
+            if (nearest_slot[index] == no_parent) throw std::runtime_error("No finite LVC root distance");
+        } catch (...) {
+#pragma omp critical(lvc_build_failure)
+            { if (!failure) failure = std::current_exception(); }
+        }
+    }
+    if (failure) std::rethrow_exception(failure);
+    now = Clock::now();
+    if (timings) {
+        timings->fallback_root_search_seconds = std::chrono::duration<double>(now - start).count();
+        timings->fallback_root_distances = uint64_t(unresolved.size()) * roots.size();
+    }
+    start = now;
+    // unresolved is ascending. Preserve that order within every root bucket.
+    for (size_t i = 0; i < unresolved.size(); ++i) pending[nearest_slot[i]].push_back(unresolved[i]);
+    uint64_t tree_distances = 0, max_tree_nodes = 0;
+    for (size_t j = 0; j < roots.size(); ++j) {
+        const uint64_t f = pending[j].size(), n = members[j].size();
+        tree_distances += f * n + (f ? f * (f - 1) / 2 : 0);
+        max_tree_nodes = std::max(max_tree_nodes, n + f);
+        members[j].reserve(n + f);
+    }
+    now = Clock::now();
+    bucket_seconds += std::chrono::duration<double>(now - start).count();
+    start = now;
+    // Different root trees are independent. Within a tree, only nodes already
+    // assigned (including earlier fallback nodes) can become a predecessor.
+#pragma omp parallel for num_threads(build_threads) schedule(dynamic, 1) if(build_threads > 1)
+    for (size_t j = 0; j < roots.size(); ++j) {
+        try {
+            auto &candidates = members[j];
+            for (uint32_t id : pending[j]) {
+                float best = std::numeric_limits<float>::max();
+                uint32_t parent = no_parent;
+                for (uint32_t candidate : candidates) {
+                    const float d = distance(id, candidate);
+                    if (d < best || (parent != no_parent && d == best && candidate < parent)) {
+                        best = d; parent = candidate;
+                    }
+                }
+                if (parent == no_parent) throw std::runtime_error("No finite LVC predecessor distance");
+                forest.parent[id] = parent;
+                forest.depth[id] = forest.depth[parent] + 1;
+                root_of[id] = roots[j];
+                candidates.push_back(id);
+            }
+        } catch (...) {
+#pragma omp critical(lvc_build_failure)
+            { if (!failure) failure = std::current_exception(); }
+        }
+    }
+    if (failure) std::rethrow_exception(failure);
+    forest.fallback_nodes = static_cast<uint32_t>(unresolved.size());
+    if (timings) {
+        timings->fallback_bucket_seconds = bucket_seconds;
+        timings->fallback_tree_search_seconds = std::chrono::duration<double>(Clock::now() - start).count();
+        timings->fallback_tree_distances = tree_distances;
+        timings->fallback_max_tree_nodes = max_tree_nodes;
+    }
+}
+
 // Neighbors and vectors use dense local IDs. For a disk cache, callers must
 // filter neighbors to cached nodes and map global IDs to local IDs first.
 template <typename NeighborFn, typename VectorFn>
 Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn vector,
-                    int chain_max = 2, ForestBuildTimings *timings = nullptr, int build_threads = 1) {
+                    int chain_max = 2, ForestBuildTimings *timings = nullptr, int build_threads = 1,
+                    int fallback_root_candidates = 0) {
     validate_build_threads(build_threads);
+    if (fallback_root_candidates != 0 && fallback_root_candidates != 1)
+        throw std::invalid_argument("LVC fallback root candidates must be 0 (global) or 1 (nearest root)");
     if (count == 0 || dim == 0) throw std::runtime_error("Empty LVC forest input");
     if (chain_max != -1 && chain_max < 2) throw std::runtime_error("LVC chain_max must be -1 or >= 2");
     using Clock = std::chrono::steady_clock;
@@ -181,6 +280,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
                 if (best_parent != no_parent) {
                     forest.parent[i] = best_parent;
                     forest.depth[i] = forest.depth[best_parent] + 1;
+                    assigned[i] = assigned[best_parent];
                     visited[i] = 1;
                     changed = true;
                 }
@@ -191,6 +291,13 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         // chain. A root is always eligible, so root count remains fixed.
         std::vector<uint32_t> unresolved;
         for (uint32_t i = 0; i < count; ++i) if (!visited[i]) unresolved.push_back(i);
+        if (chain_max == -1 && fallback_root_candidates == 1) {
+            assign_root_local_fallback(forest, assigned, is_root, unresolved, distance, build_threads, timings);
+            finish_stage(&ForestBuildTimings::fallback_seconds);
+            validate_forest(forest);
+            finish_stage(&ForestBuildTimings::finalize_seconds);
+            return forest;
+        }
         std::vector<float> best_distances(build_threads);
         std::vector<uint32_t> best_parents(build_threads);
         std::exception_ptr failure;

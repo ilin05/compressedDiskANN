@@ -432,7 +432,7 @@ void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &n
         if (!csv) throw std::runtime_error("Cannot open sample CSV: " + csv_path);
         csv << "codec,chain_max,nodes,dim,payload_bytes,record_metadata_bytes,state_cache_bytes,state_cache_payload_bytes,"
                "adjacency_bytes_per_node,nhood_bucket_bytes,coord_bucket_bytes,nhood_max_load,coord_max_load,"
-               "nhood_sample_buckets,coord_sample_buckets,roots,max_depth,average_depth,mean_reference_l2,forest_hash,load_seconds,forest_seconds,encode_seconds,state_seconds,verified_vectors\n";
+               "nhood_sample_buckets,coord_sample_buckets,roots,max_depth,average_depth,mean_reference_l2,forest_hash,load_seconds,forest_seconds,encode_seconds,state_seconds,verified_vectors,fallback_root_candidates\n";
         csv << std::setprecision(12);
         const auto emit = [&](const std::string &codec, int chain, uint64_t payload, uint64_t metadata,
                               uint64_t state, uint64_t state_payload, uint32_t roots, uint32_t max_depth,
@@ -444,7 +444,8 @@ void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &n
                 << sizeof(tsl::detail_robin_hash::bucket_entry<typename decltype(_coord_cache)::value_type, false>) << ','
                 << _nhood_cache.max_load_factor() << ',' << _coord_cache.max_load_factor() << ','
                 << nhood_sample_buckets << ',' << coord_sample_buckets << ',' << roots << ',' << max_depth << ',' << avg_depth << ',' << ref << ',' << hash << ','
-                << load_s << ',' << forest_s << ',' << encode_s << ',' << state_s << ',' << verified << '\n';
+                << load_s << ',' << forest_s << ',' << encode_s << ',' << state_s << ',' << verified
+                << ',' << _lvc_fallback_root_candidates << '\n';
             csv.flush();
             diskann::cout << "SAMPLE codec=" << codec << " chain=" << chain << " payload=" << payload
                           << " metadata=" << metadata << " state=" << state << std::endl;
@@ -463,7 +464,7 @@ void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &n
             Timer forest_timer;
             const auto forest = lvc::build_forest(count, _data_dim,
                 [&](uint32_t id) -> const std::vector<uint32_t>& { return neighbors[id]; }, vector, chain,
-                nullptr, _lvc_build_threads);
+                nullptr, _lvc_build_threads, _lvc_fallback_root_candidates);
             const double forest_s = forest_timer.elapsed() * 1e-6;
             uint64_t sum_depth = 0, hash = 1469598103934665603ULL;
             uint32_t max_depth = 0;
@@ -539,6 +540,13 @@ void PQFlashIndex<T, LabelT>::set_lvc_build_threads(int threads)
 {
     lvc::validate_build_threads(threads);
     _lvc_build_threads = threads;
+}
+
+template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_lvc_fallback_root_candidates(int count)
+{
+    if (count != 0 && count != 1) throw std::invalid_argument("LVC fallback root candidates must be 0 or 1");
+    _lvc_fallback_root_candidates = count;
 }
 
 template <typename T, typename LabelT>
@@ -710,7 +718,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
                                               static_cast<uint32_t>(_data_dim),
                                               [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
-                                              vector, _lvc_chain_max, &forest_timings, _lvc_build_threads);
+                                              vector, _lvc_chain_max, &forest_timings, _lvc_build_threads,
+                                              _lvc_fallback_root_candidates);
         _cache_forest_build_seconds = forest_timer.elapsed() * 1e-6;
         uint64_t depth_sum = 0, max_depth = 0, forest_hash = 1469598103934665603ULL;
         for (size_t i = 0; i < forest.parent.size(); ++i) {
@@ -743,10 +752,17 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                       << "LVC_BUILD_TIMING nodes=" << cached_ids.size() << " chain_max=" << _lvc_chain_max
                       << " mode=" << _cache_payload_mode << " roots=" << forest.initial_roots
                       << " build_threads=" << _lvc_build_threads
+                      << " fallback_root_candidates=" << _lvc_fallback_root_candidates
                       << " rounds=" << forest.propagation_rounds << " fallback_nodes=" << forest.fallback_nodes
                       << " root_selection_seconds=" << forest_timings.root_selection_seconds
                       << " propagation_seconds=" << forest_timings.propagation_seconds
                       << " fallback_seconds=" << forest_timings.fallback_seconds
+                      << " fallback_bucket_seconds=" << forest_timings.fallback_bucket_seconds
+                      << " fallback_root_search_seconds=" << forest_timings.fallback_root_search_seconds
+                      << " fallback_tree_search_seconds=" << forest_timings.fallback_tree_search_seconds
+                      << " fallback_root_distances=" << forest_timings.fallback_root_distances
+                      << " fallback_tree_distances=" << forest_timings.fallback_tree_distances
+                      << " fallback_max_tree_nodes=" << forest_timings.fallback_max_tree_nodes
                       << " finalize_seconds=" << forest_timings.finalize_seconds
                       << " forest_seconds=" << _cache_forest_build_seconds
                       << " encode_seconds=" << encode_seconds << std::endl;

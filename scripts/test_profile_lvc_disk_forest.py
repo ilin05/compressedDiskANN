@@ -11,9 +11,12 @@ import unittest
 
 from test_lvc_disk_payload_budget import FAKE_SEARCH
 
-FIXTURE = FAKE_SEARCH + r'''
+SAMPLE_FIXTURE = FAKE_SEARCH.replace('rows.append(dict(codec=c,',
+    "rows.append(dict(fallback_root_candidates=int(rest[rest.index('--lvc_fallback_root_candidates')+1]),codec=c,")
+FIXTURE = SAMPLE_FIXTURE + r'''
 threads=int(rest[rest.index('--lvc_build_threads')+1])
-print('LVC_BUILD_TIMING nodes={} chain_max={} mode=2 roots={} rounds=3 fallback_nodes=2 build_threads={} root_selection_seconds=0.01 propagation_seconds=0.02 fallback_seconds=0.03 finalize_seconds=0.001 forest_seconds=0.062 encode_seconds=0.04'.format(n,ch,n//100,threads))
+policy=int(rest[rest.index('--lvc_fallback_root_candidates')+1])
+print('LVC_BUILD_TIMING nodes={} chain_max={} mode=2 roots={} rounds=3 fallback_nodes=2 build_threads={} fallback_root_candidates={} fallback_tree_distances=20 fallback_root_distances=10 fallback_bucket_seconds=0.005 fallback_root_search_seconds=0.01 fallback_tree_search_seconds=0.015 fallback_max_tree_nodes=15 root_selection_seconds=0.01 propagation_seconds=0.02 fallback_seconds=0.03 finalize_seconds=0.001 forest_seconds=0.062 encode_seconds=0.04'.format(n,ch,n//100,threads,policy))
 print('LVC_CACHE_LOAD_TIMING cache_read_seconds=0.1 remap_seconds=0.1 compact_seconds=0.1 state_seconds=0.1 verify_seconds=0.1 cache_total_seconds=0.7 cache_other_seconds=0.098')
 print('LVC_LOAD_TIMING index_load_seconds=1 cache_selection_seconds=0.2 cache_data_load_seconds=0.8 total_load_seconds=2')
 print('LVC disk cache PASS bitwise vectors={}/{} coordinates=1/1'.format(n,n))
@@ -48,12 +51,22 @@ class ForestProfileTests(unittest.TestCase):
             self.assertTrue(all('--cache_budget_probe_only' in c['rest'] and '--verify_cache' in c['rest']
                                 for c in calls[1:]))
             # Older binaries cannot silently generate a successful zero-time report.
-            binary.write_text(FAKE_SEARCH)
+            binary.write_text(SAMPLE_FIXTURE)
             result = subprocess.run(command, stdout=subprocess.DEVNULL)
             self.assertNotEqual(result.returncode, 0)
             rows = list(csv.DictReader((root / 'out/summary.csv').read_text().splitlines()))
             self.assertEqual(len(rows), 2)
             self.assertTrue(all(r['status'] == 'failed' for r in rows))
+            # The new wrapper runs only the unbounded case after one shared sample.
+            binary.write_text(FIXTURE)
+            subprocess.run(command + ['--chains', '-1'], check=True, stdout=subprocess.DEVNULL)
+            rows = list(csv.DictReader((root / 'out/summary.csv').read_text().splitlines()))
+            self.assertEqual([int(r['chain_max']) for r in rows], [-1])
+            self.assertEqual(int(rows[0]['fallback_root_candidates']), 1)
+            subprocess.run(command + ['--chains', '-1', '--fallback-root-candidates', '0'],
+                           check=True, stdout=subprocess.DEVNULL)
+            rows = list(csv.DictReader((root / 'out/summary.csv').read_text().splitlines()))
+            self.assertEqual(int(rows[0]['fallback_root_candidates']), 0)
 
 
 if __name__ == '__main__':

@@ -43,8 +43,8 @@ Results are written to
 ## Timing boundaries
 
 Timers use `steady_clock`/wall time and run only at stage boundaries; no timers
-are added inside node, coordinate or distance loops. The forest algorithm is
-unchanged.
+are added inside node, coordinate or distance loops. Timing instrumentation does
+not affect parent selection; the selected fallback policy is described below.
 
 | Column | Included work |
 |---|---|
@@ -121,9 +121,10 @@ LVC_BUILD_THREADS=8 bash scripts/profile_lvc_disk_forest_bigann_1B.sh
 The CLI defaults to 32; other library callers retain a one-thread default.
 The maximum is configurable; OpenMP runtime limits can yield fewer workers.
 Propagation remains serial. Chain=2 fallback uses an ascending-ID root list and
-parallelizes independent unresolved nodes. Deep-chain fallback keeps assignment
-order serial, parallelizing candidate distances with deterministic distance/ID
-tie breaking using one persistent team.
+parallelizes independent unresolved nodes. Bounded deep chains and the legacy
+unbounded policy keep assignment order serial, parallelizing candidate distances
+with deterministic distance/ID tie breaking using one persistent team. The new
+default unbounded policy is nearest-root-local, described below.
 
 Additional `summary.csv` timing columns:
 
@@ -156,3 +157,79 @@ input/sample settings with `LVC_BUILD_THREADS=1` and `32`. Both runs use the
 optimized root-state reuse, so this measures thread scaling, not the benefit of
 root-state reuse alone. These profiles report measured results, not a guaranteed
 32x speedup. An over-budget attempt is recorded without an automatic retry.
+
+## Nearest-root-local unbounded fallback (k=1)
+
+For the DeXOR BIGANN-1B unbounded-only test, run:
+
+```bash
+bash scripts/test_lvc_parallel_build.sh
+nohup bash scripts/profile_lvc_disk_forest_bigann_1B_root_local.sh \
+  > profile_lvc_disk_forest_bigann_1B_root_local_output.log 2>&1 &
+```
+
+Default settings: 1 GiB cache budget, 0.975 GiB planning budget, 1M-node sample,
+32 build threads, degree-selected 1% initial roots, 1% retained root state cache.
+The production run tests only DeXOR `chain_max=-1`, verifies every cache vector
+bitwise, and exits before query search. Sampling still uses the shared sampler
+for all codecs and both chains. Both sampling and production explicitly use
+the same new policy; samples are recomputed on each invocation.
+
+Results use a separate directory, preserving previous global-fallback results:
+
+```text
+scripts/lvc_disk_forest_profile_results/bigann_1B_1GiB_root_local/
+```
+
+The algorithm changes only unbounded fallback:
+
+1. Keep the existing initial roots and graph-neighbor propagation.
+2. Group propagated nodes by their predecessor-tree root.
+3. Find the exact nearest initial root for each unresolved node; equal distances
+   select the smallest root ID.
+4. Within that root's tree, select the nearest already assigned member. This
+   includes earlier fallback nodes in the same bucket. Equal predecessor
+   distances select the smallest node ID.
+5. Append the newly assigned node to its root bucket.
+
+Root search is parallel across unresolved nodes. Tree search is parallel across
+root buckets, with ascending node ID order inside each bucket. Different buckets
+are independent, giving the same forest as serial ascending-ID execution of
+this policy. Only assigned nodes become parents, preventing cycles.
+
+This is predecessor-tree membership, **not** reachability along outgoing cache
+graph edges. It changes the former global nearest-predecessor guarantee, so
+compression ratio, reference distances and depths may change. Query decoding
+and full F32 lossless restoration retain their existing semantics.
+
+`search_disk_index --lvc_fallback_root_candidates 1` is now the DiskANN default;
+`0` selects the original global fallback for comparisons. This first version
+supports only 0 or 1 and ignores the setting for bounded chains. The low-level
+`lvc::build_forest` default remains 0 to preserve existing Vamana callers;
+DiskANN sample/load callers explicitly pass their selected policy.
+
+New report fields (also present in `LVC_BUILD_TIMING`):
+
+- `fallback_root_candidates`: policy, checked against sample metadata.
+- `fallback_bucket_seconds`: tree membership grouping and pending-node grouping.
+- `fallback_root_search_seconds`: exact nearest-root search.
+- `fallback_tree_search_seconds`: sequential search inside each tree, parallel
+  across trees.
+- `fallback_root_distances`, `fallback_tree_distances`: actual number of
+  candidate L2 evaluations in successful root/tree searches.
+- `fallback_max_tree_nodes`: largest final root-tree membership count.
+- `fallback_mean_tree_candidates`: tree distance evaluations / fallback nodes.
+- `payload_ratio_f32`, `average_depth`, `max_depth`, `forest_hash`: production
+  compression/depth statistics for comparison with prior runs.
+
+The three fallback sub-stage times are part of `fallback_seconds`, not additional
+load stages. Candidate counts avoid per-distance timing calls. Root search costs
+`F * R` distances; tree search depends on bucket sizes and load skew. There is
+no guaranteed bound on maximum bucket size. Transient membership lists and raw
+vectors are outside the retained cache budget.
+
+The standalone correctness test includes an independent serial k=1 oracle,
+one/32-thread equality, exact candidate counters, a case where k=1 must reject
+the globally nearest predecessor, root-distance ties, and lossless encoding for
+all three codecs. Python driver fixtures check unbounded-only execution and
+policy propagation; they are not ANN performance measurements.

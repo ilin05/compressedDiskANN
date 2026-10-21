@@ -8,6 +8,62 @@ static void require(bool value, const char *message) {
     if (!value) throw std::runtime_error(message);
 }
 
+// Independent serial oracle: outgoing-neighbor propagation, then ascending-ID
+// fallback, exact nearest root, and an ascending scan restricted to its tree.
+template <typename NeighborFn, typename VectorFn>
+lvc::Forest reference_root_local(const lvc::Forest &root_source, uint32_t dim,
+                                  NeighborFn neighbors, VectorFn vector,
+                                  uint64_t &root_distances, uint64_t &tree_distances) {
+    const uint32_t n = static_cast<uint32_t>(root_source.parent.size());
+    lvc::Forest result;
+    result.initial_roots = root_source.initial_roots;
+    result.parent.assign(n, lvc::no_parent); result.depth.assign(n, 0);
+    std::vector<uint32_t> root_of(n, lvc::no_parent), roots;
+    for (uint32_t i = 0; i < n; ++i) if (root_source.parent[i] == lvc::no_parent) {
+        roots.push_back(i); root_of[i] = i;
+    }
+    auto distance = [&](uint32_t a, uint32_t b) {
+        float sum = 0;
+        for (uint32_t j = 0; j < dim; ++j) { const float d = vector(a)[j] - vector(b)[j]; sum += d*d; }
+        return sum;
+    };
+    bool changed = true;
+    while (changed) {
+        changed = false; ++result.propagation_rounds;
+        for (uint32_t i = 0; i < n; ++i) if (root_of[i] == lvc::no_parent) {
+            float best = std::numeric_limits<float>::max();
+            for (uint32_t candidate : neighbors(i)) if (root_of[candidate] != lvc::no_parent) {
+                const float d = distance(i, candidate);
+                if (d < best) { best = d; result.parent[i] = candidate; }
+            }
+            if (result.parent[i] != lvc::no_parent) {
+                root_of[i] = root_of[result.parent[i]];
+                result.depth[i] = result.depth[result.parent[i]] + 1;
+                changed = true;
+            }
+        }
+    }
+    for (uint32_t i = 0; i < n; ++i) if (root_of[i] == lvc::no_parent) {
+        uint32_t root = lvc::no_parent;
+        float best = std::numeric_limits<float>::max();
+        for (uint32_t r : roots) {
+            ++root_distances;
+            const float d = distance(i, r);
+            if (d < best) { best = d; root = r; }
+        }
+        best = std::numeric_limits<float>::max();
+        for (uint32_t candidate = 0; candidate < n; ++candidate) if (root_of[candidate] == root) {
+            ++tree_distances;
+            const float d = distance(i, candidate);
+            if (d < best) { best = d; result.parent[i] = candidate; }
+        }
+        root_of[i] = root; result.depth[i] = result.depth[result.parent[i]] + 1;
+        ++result.fallback_nodes;
+    }
+    lvc::validate_forest(result);
+    return result;
+}
+
 // Original sequential encoding, with no root state reuse, is the byte oracle.
 template <typename Codec, typename VectorFn>
 lvc::RecordStore<Codec> reference_store(const lvc::Forest &forest, uint32_t dim, VectorFn vector) {
@@ -66,6 +122,25 @@ int main(int argc, char **argv) {
             auto vector = [&](uint32_t id) { return values.data() + size_t(id) * dim; };
             const auto serial = lvc::build_forest(n, dim, neighbors, vector, chain);
             require(serial.fallback_nodes > 0, "Fixture did not exercise fallback");
+            if (chain == -1) {
+                uint64_t root_distances = 0, tree_distances = 0;
+                const auto expected = reference_root_local(serial, dim, neighbors, vector, root_distances, tree_distances);
+                for (int threads : {1, maximum}) {
+                    lvc::ForestBuildTimings timings;
+                    const auto local = lvc::build_forest(n, dim, neighbors, vector, chain, &timings, threads, 1);
+                    require(local.parent == expected.parent && local.depth == expected.depth &&
+                            local.fallback_nodes == expected.fallback_nodes &&
+                            local.propagation_rounds == expected.propagation_rounds,
+                            "Root-local fallback differs from serial specification");
+                    require(timings.fallback_root_distances == root_distances &&
+                            timings.fallback_tree_distances == tree_distances, "Incorrect candidate counters");
+                    check_codec<hnswlib::codecs::DeXORCodecPolicy>(local, dim, vector, threads);
+                    check_codec<hnswlib::codecs::GorillaCodecPolicy>(local, dim, vector, threads);
+                    check_codec<hnswlib::codecs::ElfCodecPolicy>(local, dim, vector, threads);
+                }
+                std::cout << "PASS nearest-root fallback: serial oracle, 1/" << maximum
+                          << " threads, distance counts, lossless codec bytes\n";
+            }
             for (int threads : {1, maximum}) {
                 const auto parallel = lvc::build_forest(n, dim, neighbors, vector, chain, nullptr, threads);
                 require(parallel.parent == serial.parent && parallel.depth == serial.depth &&
@@ -93,6 +168,20 @@ int main(int argc, char **argv) {
             require(caught, "Fallback worker exception was not propagated");
             std::cout << "PASS chain=" << chain << " threads=1/" << maximum
                       << " deterministic forest, legacy codec bytes, bitwise recovery, worker exceptions\n";
+        }
+        {
+            // A globally nearest predecessor can belong to a different root.
+            std::vector<std::vector<uint32_t>> empty(200);
+            std::vector<float> values(200, 1000);
+            values[0] = 0; values[1] = 10; values[2] = 6; values[3] = 4.9f; values[4] = 5;
+            auto neighbors = [&](uint32_t id) -> const std::vector<uint32_t>& { return empty[id]; };
+            auto vector = [&](uint32_t id) { return &values[id]; };
+            const auto global = lvc::build_forest(200, 1, neighbors, vector, -1);
+            const auto local = lvc::build_forest(200, 1, neighbors, vector, -1, nullptr, maximum, 1);
+            require(global.parent[3] == 2 && local.parent[3] == 0,
+                    "Nearest-root restriction is not enforced");
+            require(local.parent[4] == 3, "Equal root distances must select root ID 0");
+            std::cout << "PASS root-local restriction and root-distance ties\n";
         }
     } catch (const std::exception &error) {
         std::cerr << "FAIL: " << error.what() << '\n';

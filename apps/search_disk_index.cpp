@@ -87,7 +87,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const uint64_t cache_budget_bytes = 0, const bool cache_budget_probe_only = false,
                       const int lvc_chain_max = 2, const bool cache_budget_include_state = false,
                       const std::string &cache_budget_sample_csv = "",
-                      const std::string &cache_node_ids_file = "", const int lvc_build_threads = 32)
+                      const std::string &cache_node_ids_file = "", const int lvc_build_threads = 32,
+                      const int lvc_fallback_root_candidates = 1)
 {
     struct SearchCsvRow
     {
@@ -177,6 +178,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     _pFlashIndex->set_lvc_state_cache_ratio(lvc_state_cache_ratio);
     _pFlashIndex->set_lvc_chain_max(lvc_chain_max);
     _pFlashIndex->set_lvc_build_threads(lvc_build_threads);
+    _pFlashIndex->set_lvc_fallback_root_candidates(lvc_fallback_root_candidates);
     const auto cache_start = std::chrono::steady_clock::now();
 
     // 用 bfs 算法确定要 aching 的节点列表，优先缓存距离 medoid(s) 较近的节点
@@ -542,6 +544,7 @@ int main(int argc, char **argv)
     bool cache_budget_include_state = false;
     int lvc_chain_max = 2;
     int lvc_build_threads = 32;
+    int lvc_fallback_root_candidates = 1;
     std::string cache_budget_sample_csv;
     std::string cache_node_ids_file;
     uint64_t cache_budget_bytes = 0;
@@ -589,6 +592,8 @@ int main(int argc, char **argv)
                                        "Maximum record chain including root; -1 means unbounded");
         optional_configs.add_options()("lvc_build_threads", po::value<int>(&lvc_build_threads)->default_value(32),
                                        "Maximum forest fallback/record encoding threads, independent of query -T");
+        optional_configs.add_options()("lvc_fallback_root_candidates", po::value<int>(&lvc_fallback_root_candidates)->default_value(1),
+                                       "Unbounded fallback: 1=nearest root tree, 0=legacy global candidates");
         optional_configs.add_options()("cache_budget_include_state", po::bool_switch(&cache_budget_include_state),
                                        "Include decoding state and estimated state-map allocations in the cache cap");
         optional_configs.add_options()("cache_budget_sample_csv", po::value<std::string>(&cache_budget_sample_csv)->default_value(""),
@@ -715,15 +720,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -735,15 +740,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
