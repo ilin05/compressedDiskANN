@@ -233,3 +233,44 @@ one/32-thread equality, exact candidate counters, a case where k=1 must reject
 the globally nearest predecessor, root-distance ties, and lossless encoding for
 all three codecs. Python driver fixtures check unbounded-only execution and
 policy propagation; they are not ANN performance measurements.
+
+## BIGANN-1B / DeXOR unbounded / 4 GiB load and search
+
+```bash
+nohup bash scripts/test_lvc_disk_bigann_1B_dexor_unbounded_4GiB.sh \
+  > test_lvc_disk_bigann_1B_dexor_unbounded_4GiB_output.log 2>&1 &
+```
+
+Defaults:
+
+- Nominal budget 4 GiB; planning budget 3.9 GiB (3993.6 MiB).
+- Existing BIGANN-1B index/query files and `build/data/bigann/bigann_1B_gt.bin`.
+- Fresh 1M-node shared sample, then one DeXOR unbounded production attempt.
+- Nearest-root-local fallback k=1; degree roots 1%; query state cache 1%.
+- Up to 32 forest/encoding threads, query `-T 1`, `-K 1`, `-L 1 5 10`,
+  `-R 3`, beamwidth `-W 2`. All L/rounds reuse the same loaded index.
+- No probe-only exit: actual search results and ground-truth recall@1 are saved.
+- Full cache bitwise verification defaults off for load/performance measurement;
+  set `VERIFY_CACHE=1` to include it, timed separately.
+- No hard budget cap/retry: an over-budget attempt still searches and is marked
+  `over_budget` in the report. PQ and node lookups remain outside this budget.
+
+The default output directory is
+`scripts/lvc_disk_payload_budget_results/bigann_1B_dexor_unbounded_4GiB/`:
+
+- `summary.csv`, `dexor_chunbounded_timings.csv`: one load timing/budget row.
+- `search_results.csv`: three rows with load timing/budget information plus L,
+  rounds, recall@1 in percent, QPS, mean/p999 latency in microseconds, mean I/Os.
+- `dexor_chunbounded_search_summary.csv`: original application search report,
+  including memory measurements.
+- `dexor_chunbounded.log`, timing JSON, `config.json`, and shared sample files.
+- Final query result ID/distance binaries written by `search_disk_index`.
+
+`LVC_BUILD_THREADS`, `BUILD_THREADS`, `BUILD_DIR`, `DATA_DIR`, `INDEX_PREFIX`,
+`QUERY_FILE`, `GT_FILE`, `OUTPUT_DIR`, `SKIP_BUILD`, `SAMPLE_NODES`,
+`BUDGET_MIB`, `PLANNING_BUDGET_MIB`, `PERF_W`, and `VERIFY_CACHE` can be set
+at launch. Query thread count and L/rounds remain fixed as above in this wrapper.
+Each invocation runs afresh; use distinct `OUTPUT_DIR` values to retain repeats.
+In search mode, `process_other_seconds` includes query execution and warmup,
+as well as process startup/cleanup. It is not pure query time. The load timers
+and their denominators retain the same meaning as in load-only profiles.

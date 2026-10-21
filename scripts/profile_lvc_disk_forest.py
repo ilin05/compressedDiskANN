@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Profile production DeXOR cache construction; queries are intentionally skipped."""
+"""Profile DeXOR cache construction, optionally followed by ground-truth query search."""
 import argparse
 import json
 import os
@@ -40,12 +40,21 @@ def main():
     parser.add_argument("--build-threads", type=int, default=1)
     parser.add_argument("--chains", type=int, nargs="+", default=[2, -1], choices=[2, -1])
     parser.add_argument("--fallback-root-candidates", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--search", action="store_true", help="Run queries after cache construction")
+    parser.add_argument("--gt", type=Path)
+    parser.add_argument("--L", nargs="+", type=int, default=[1])
+    parser.add_argument("--rounds", type=int, default=1)
+    parser.add_argument("--beamwidth", type=int, default=1)
+    parser.add_argument("--skip-verify-cache", action="store_true")
     args = parser.parse_args()
     budget = int(args.budget_mib * 2**20)
     planning = int(args.planning_budget_mib * 2**20)
     if (not 0 < planning <= budget or args.build_threads < 1 or args.expected_points < 2 or
-            not 1 <= args.sample_nodes <= args.expected_points // 2 or len(set(args.chains)) != len(args.chains)):
+            not 1 <= args.sample_nodes <= args.expected_points // 2 or len(set(args.chains)) != len(args.chains) or
+            min(args.L) < 1 or len(set(args.L)) != len(args.L) or min(args.rounds, args.beamwidth) < 1):
         parser.error("Invalid sample size or budget")
+    if args.search and (args.gt is None or not args.gt.is_file()):
+        parser.error("Query search requires an existing --gt file for recall@1")
     out = args.output_dir.absolute()
     out.mkdir(parents=True, exist_ok=True)
     index = str(args.index_prefix.absolute())
@@ -56,14 +65,17 @@ def main():
     os.environ.update(OMP_NUM_THREADS=str(args.build_threads), OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     common = [str(args.binary.absolute()), "--data_type", "float", "--dist_fn", "l2",
               "--index_path_prefix", index, "--query_file", str(args.query.absolute()),
-              "--gt_file", "null", "-T", "1", "-K", "1", "-L", "1", "-W", "1", "-R", "1",
+              "--gt_file", str(args.gt.absolute()) if args.search else "null", "-T", "1", "-K", "1",
+              "-L", *map(str, args.L), "-W", str(args.beamwidth), "-R", str(args.rounds),
               "--lvc_state_cache_ratio", "0.01", "--lvc_build_threads", str(args.build_threads),
               "--lvc_fallback_root_candidates", str(args.fallback_root_candidates)]
     save_json(out / "config.json", dict(index=index, threads=1, build_threads=args.build_threads,
+              query=str(args.query.absolute()), gt=str(args.gt.absolute()) if args.search else None,
               expected_points=args.expected_points, budget_bytes=budget,
               planning_budget_bytes=planning, sample_nodes=args.sample_nodes, codec="dexor",
               chains=args.chains, fallback_root_candidates=args.fallback_root_candidates,
-              query_search=False, verify_cache=True,
+              query_search=args.search, verify_cache=not args.skip_verify_cache,
+              L=args.L, rounds=args.rounds, beamwidth=args.beamwidth, k=1,
               budget_definition="adjacency + payload + record metadata + state cache; excludes PQ/node lookups"))
     sample = out / "sample.csv"
     if sample.exists():
@@ -79,6 +91,10 @@ def main():
            for row in samples.values()):
         raise ValueError("Sample forest policy mismatch; rebuild search_disk_index")
     rows = []
+    search_rows = []
+    search_output = out / "search_results.csv"
+    if args.search and search_output.exists():
+        search_output.unlink()
     failed = False
     for chain in args.chains:
         tag = "dexor_ch2" if chain == 2 else "dexor_chunbounded"
@@ -86,13 +102,20 @@ def main():
         nodes = select_nodes(row, planning, points // 2)
         record = dict(case=tag, chain_max=chain, threads=1, build_threads=args.build_threads, planned_nodes=nodes,
                       budget_bytes=budget, estimated_budget_bytes=estimate(row, nodes)["budget_bytes"],
-                      status="failed", error="")
+                      query_search=args.search, verify_cache=not args.skip_verify_cache, status="failed", error="")
         log = out / (tag + ".log")
         print("PROFILE {} nodes={} budget={} bytes".format(tag, nodes, budget), flush=True)
         try:
-            code = run_logged(common + ["--cache_codec", "dexor", "--num_nodes_to_cache", str(nodes),
-                "--lvc_chain_max", str(chain), "--cache_budget_include_state", "--cache_budget_probe_only",
-                "--verify_cache", "--result_path", str(out / tag)], log)
+            source = out / (tag + "_search_summary.csv")
+            if args.search and source.exists():
+                source.unlink()
+            command = common + ["--cache_codec", "dexor", "--num_nodes_to_cache", str(nodes),
+                "--lvc_chain_max", str(chain), "--cache_budget_include_state", "--result_path", str(out / tag)]
+            if not args.search:
+                command.append("--cache_budget_probe_only")
+            if not args.skip_verify_cache:
+                command.append("--verify_cache")
+            code = run_logged(command, log)
             record.update(exit_code=code, process_wall_seconds=json.loads(
                 log.with_suffix(".timing.json").read_text())["wall_seconds"])
             if code:
@@ -110,11 +133,12 @@ def main():
             used = actual_budget(stats)
             text = log.read_text()
             verified = re.search(r"LVC disk cache PASS bitwise vectors=(\d+)/(\d+)", text)
-            if not verified or tuple(map(int, verified.groups())) != (nodes, nodes):
+            if not args.skip_verify_cache and (not verified or tuple(map(int, verified.groups())) != (nodes, nodes)):
                 raise ValueError("Full cache lossless verification missing")
             record.update(actual_nodes=stats["nodes"], actual_budget_bytes=used,
                           budget_utilization=used / budget, within_budget=used <= budget,
-                          verified_vectors=nodes, status="ok" if used <= budget else "over_budget")
+                          verified_vectors=nodes if not args.skip_verify_cache else "",
+                          status="ok" if used <= budget else "over_budget")
             forest = forest_from_log(log)
             record.update(payload_bytes=stats["vector_payload_bytes"],
                           payload_ratio_f32=nodes * int(row["dim"]) * 4 / stats["vector_payload_bytes"],
@@ -146,6 +170,21 @@ def main():
             for stage in ("fallback_bucket", "fallback_root_search", "fallback_tree_search"):
                 if stage + "_seconds" in record:
                     record[stage + "_load_percent"] = 100 * record[stage + "_seconds"] / load if load else 0
+            if args.search:
+                results = csv_rows(source)
+                if [int(result["L"]) for result in results] != args.L:
+                    raise ValueError("Incomplete query results: " + str(source))
+                current = []
+                for result in results:
+                    if not result.get("Recall@1", "").strip():
+                        raise ValueError("Missing ground-truth recall@1")
+                    current.append(dict(record, k=1, L=int(result["L"]), rounds=args.rounds,
+                        beamwidth=int(result["Beamwidth"]), recall_at_1_percent=float(result["Recall@1"]),
+                        qps=float(result["QPS"]), mean_us=float(result["Mean Latency (mus)"]),
+                        p999_us=float(result["99.9 Latency"]), mean_ios=float(result["Mean IOs"])))
+                search_rows.extend(current)
+                fields = list(dict.fromkeys(key for item in search_rows for key in item))
+                save_csv(search_output, [{key: item.get(key, "") for key in fields} for item in search_rows])
             print("{}: roots={:.6f}s propagation={:.6f}s fallback={:.6f}s encode={:.6f}s".format(
                 tag, *(record[key + "_seconds"] for key in
                        ("root_selection", "propagation", "fallback", "encode"))), flush=True)
@@ -159,6 +198,8 @@ def main():
         fields = list(dict.fromkeys(key for item in rows for key in item))
         save_csv(out / "summary.csv", [{key: item.get(key, "") for key in fields} for item in rows])
     print("Timing results:", out / "summary.csv", flush=True)
+    if args.search:
+        print("Search results:", search_output, flush=True)
     if failed:
         raise SystemExit(1)
 

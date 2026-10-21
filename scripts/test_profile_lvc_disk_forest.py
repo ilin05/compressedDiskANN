@@ -2,6 +2,7 @@
 """Driver/accounting fixtures only; no ANN performance numbers are measured."""
 import csv
 import json
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -13,6 +14,9 @@ from test_lvc_disk_payload_budget import FAKE_SEARCH
 
 SAMPLE_FIXTURE = FAKE_SEARCH.replace('rows.append(dict(codec=c,',
     "rows.append(dict(fallback_root_candidates=int(rest[rest.index('--lvc_fallback_root_candidates')+1]),codec=c,")
+SAMPLE_FIXTURE = SAMPLE_FIXTURE.replace("fields=['L',", "fields=['L','Beamwidth',")
+SAMPLE_FIXTURE = SAMPLE_FIXTURE.replace('r.update(L=level,QPS=42',
+    "r.update(L=level,Beamwidth=int(rest[rest.index('-W')+1]),QPS=42")
 FIXTURE = SAMPLE_FIXTURE + r'''
 threads=int(rest[rest.index('--lvc_build_threads')+1])
 policy=int(rest[rest.index('--lvc_fallback_root_candidates')+1])
@@ -24,6 +28,42 @@ print('LVC disk cache PASS bitwise vectors={}/{} coordinates=1/1'.format(n,n))
 
 
 class ForestProfileTests(unittest.TestCase):
+    def test_4gib_search_wrapper(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'apps').mkdir()
+            binary = root / 'apps/search_disk_index'
+            binary.write_text(FIXTURE); binary.chmod(0o755)
+            index = root / 'index'
+            Path(str(index) + '_pq_compressed.bin').write_bytes(struct.pack('<II', 1000000000, 32))
+            query, truth = root / 'query', root / 'gt'
+            query.write_bytes(b''); truth.write_bytes(b'')
+            environment = dict(os.environ, SKIP_BUILD='1', BUILD_DIR=str(root), INDEX_PREFIX=str(index),
+                               QUERY_FILE=str(query), GT_FILE=str(truth), OUTPUT_DIR=str(root / 'out'),
+                               LVC_BUILD_THREADS='32', VERIFY_CACHE='0', PERF_W='2', BUDGET_MIB='4096',
+                               PLANNING_BUDGET_MIB='3993.6', SAMPLE_NODES='1000')
+            wrapper = Path(__file__).with_name('test_lvc_disk_bigann_1B_dexor_unbounded_4GiB.sh')
+            subprocess.run(['bash', str(wrapper)], env=environment, check=True, stdout=subprocess.DEVNULL)
+            rows = list(csv.DictReader((root / 'out/search_results.csv').read_text().splitlines()))
+            self.assertEqual([int(r['L']) for r in rows], [1, 5, 10])
+            for row in rows:
+                self.assertEqual(int(row['rounds']), 3)
+                self.assertEqual(int(row['threads']), 1)
+                self.assertEqual(int(row['build_threads']), 32)
+                self.assertEqual(int(row['budget_bytes']), 4 * 2**30)
+                self.assertEqual(float(row['qps']), 42)
+                self.assertEqual(int(row['beamwidth']), 2)
+                self.assertEqual(row['status'], 'ok')
+            calls = [json.loads(line) for line in (root / 'apps/calls.jsonl').read_text().splitlines()]
+            self.assertEqual(len(calls), 2)  # One sample, one production construction/search.
+            self.assertTrue(calls[0]['sample'])
+            actual = calls[1]
+            self.assertEqual((actual['codec'], actual['chain']), ('dexor', '-1'))
+            self.assertNotIn('--cache_budget_probe_only', actual['rest'])
+            self.assertNotIn('--verify_cache', actual['rest'])
+            for flag, value in (('-R', '3'), ('-T', '1'), ('--lvc_build_threads', '32')):
+                self.assertEqual(actual['rest'][actual['rest'].index(flag) + 1], value)
+
     def test_configuration_accounting_and_failure(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
