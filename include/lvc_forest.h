@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <exception>
 #include <cstdint>
 #include <limits>
 #include <numeric>
@@ -9,12 +10,22 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "lvc_f32_codec.h"
 
 namespace diskann::lvc {
 
 constexpr uint32_t no_parent = UINT32_MAX;
+
+inline void validate_build_threads(int threads) {
+    if (threads < 1) throw std::invalid_argument("LVC build threads must be positive");
+#ifndef _OPENMP
+    if (threads != 1) throw std::invalid_argument("Parallel LVC build requires OpenMP");
+#endif
+}
 
 // Coarse wall-clock timers only: no timing calls in node/distance loops.
 struct ForestBuildTimings {
@@ -103,7 +114,8 @@ inline void validate_forest(const Forest &forest) {
 // filter neighbors to cached nodes and map global IDs to local IDs first.
 template <typename NeighborFn, typename VectorFn>
 Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn vector,
-                    int chain_max = 2, ForestBuildTimings *timings = nullptr) {
+                    int chain_max = 2, ForestBuildTimings *timings = nullptr, int build_threads = 1) {
+    validate_build_threads(build_threads);
     if (count == 0 || dim == 0) throw std::runtime_error("Empty LVC forest input");
     if (chain_max != -1 && chain_max < 2) throw std::runtime_error("LVC chain_max must be -1 or >= 2");
     using Clock = std::chrono::steady_clock;
@@ -177,20 +189,65 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         finish_stage(&ForestBuildTimings::propagation_seconds);
         // Match HNSW's fallback: scan already assigned nodes with room in the
         // chain. A root is always eligible, so root count remains fixed.
-        for (uint32_t i = 0; i < count; ++i) {
-            if (visited[i]) continue;
-            float best = std::numeric_limits<float>::max();
-            for (uint32_t candidate = 0; candidate < count; ++candidate) {
-                if (!visited[candidate] ||
-                    (chain_max > 0 && forest.depth[candidate] >= uint32_t(chain_max - 1))) continue;
-                const float d = distance(i, candidate);
-                if (d < best) { best = d; forest.parent[i] = candidate; }
+        std::vector<uint32_t> unresolved;
+        for (uint32_t i = 0; i < count; ++i) if (!visited[i]) unresolved.push_back(i);
+        std::vector<float> best_distances(build_threads);
+        std::vector<uint32_t> best_parents(build_threads);
+        std::exception_ptr failure;
+        bool invalid_distance = false;
+        // Keep assignment order serial: a newly assigned fallback node is an
+        // eligible predecessor for the next node. Reuse one OpenMP team.
+#pragma omp parallel num_threads(build_threads) if(build_threads > 1 && !unresolved.empty())
+        {
+            int worker = 0;
+#ifdef _OPENMP
+            worker = omp_get_thread_num();
+#endif
+            for (uint32_t i : unresolved) {
+                float best = std::numeric_limits<float>::max();
+                uint32_t parent = no_parent;
+#pragma omp for schedule(static) nowait
+                for (uint32_t candidate = 0; candidate < count; ++candidate) {
+                    if (!visited[candidate] ||
+                        (chain_max > 0 && forest.depth[candidate] >= uint32_t(chain_max - 1))) continue;
+                    try {
+                        const float d = distance(i, candidate);
+                        if (d < best) { best = d; parent = candidate; }
+                    } catch (...) {
+#pragma omp critical(lvc_build_failure)
+                        { if (!failure) failure = std::current_exception(); }
+                    }
+                }
+                best_distances[worker] = best;
+                best_parents[worker] = parent;
+#pragma omp barrier
+#pragma omp single
+                {
+                    float value = std::numeric_limits<float>::max();
+                    uint32_t selected = no_parent;
+                    int workers = 1;
+#ifdef _OPENMP
+                    workers = omp_get_num_threads();
+#endif
+                    for (int thread = 0; thread < workers; ++thread) {
+                        const float d = best_distances[thread];
+                        const uint32_t p = best_parents[thread];
+                        if (p != no_parent && (d < value || (d == value && p < selected))) {
+                            value = d; selected = p;
+                        }
+                    }
+                    if (selected == no_parent) invalid_distance = true;
+                    else {
+                        forest.parent[i] = selected;
+                        forest.depth[i] = forest.depth[selected] + 1;
+                        visited[i] = 1;
+                        ++forest.fallback_nodes;
+                    }
+                }
             }
-            if (forest.parent[i] == no_parent) throw std::runtime_error("No finite LVC root distance");
-            forest.depth[i] = forest.depth[forest.parent[i]] + 1;
-            visited[i] = 1;
-            ++forest.fallback_nodes;
         }
+        if (failure) std::rethrow_exception(failure);
+        if (invalid_distance) throw std::runtime_error("No finite LVC root distance");
         finish_stage(&ForestBuildTimings::fallback_seconds);
         validate_forest(forest);
         finish_stage(&ForestBuildTimings::finalize_seconds);
@@ -221,20 +278,31 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
 
     finish_stage(&ForestBuildTimings::propagation_seconds);
     // Only nodes unreached by propagation scan all initial roots.
+    std::vector<uint32_t> root_ids, unresolved;
     for (uint32_t i = 0; i < count; ++i) {
-        if (is_root[i] || assigned[i] != no_parent) continue;
-        float best = std::numeric_limits<float>::max();
-        for (uint32_t root = 0; root < count; ++root) {
-            if (!is_root[root]) continue;
-            const float d = distance(i, root);
-            if (d < best) {
-                best = d;
-                assigned[i] = root;
-            }
-        }
-        if (assigned[i] == no_parent) throw std::runtime_error("No finite LVC root distance");
-        ++forest.fallback_nodes;
+        if (is_root[i]) root_ids.push_back(i); // Ascending ID preserves distance ties.
+        else if (assigned[i] == no_parent) unresolved.push_back(i);
     }
+    std::exception_ptr failure;
+    int invalid_distance = 0;
+#pragma omp parallel for num_threads(build_threads) schedule(static) if(build_threads > 1) reduction(|:invalid_distance)
+    for (size_t index = 0; index < unresolved.size(); ++index) {
+        const uint32_t i = unresolved[index];
+        try {
+            float best = std::numeric_limits<float>::max();
+            for (uint32_t root : root_ids) {
+                const float d = distance(i, root);
+                if (d < best) { best = d; assigned[i] = root; }
+            }
+            if (assigned[i] == no_parent) invalid_distance = 1;
+        } catch (...) {
+#pragma omp critical(lvc_build_failure)
+            { if (!failure) failure = std::current_exception(); }
+        }
+    }
+    if (failure) std::rethrow_exception(failure);
+    if (invalid_distance) throw std::runtime_error("No finite LVC root distance");
+    forest.fallback_nodes = static_cast<uint32_t>(unresolved.size());
     finish_stage(&ForestBuildTimings::fallback_seconds);
 
     for (uint32_t i = 0; i < count; ++i) {
@@ -258,7 +326,9 @@ template <typename Codec> class RecordStore {
     uint64_t patches = 0;
 
     template <typename VectorFn>
-    static RecordStore build(const Forest &source, uint32_t dimension, VectorFn vector) {
+    static RecordStore build(const Forest &source, uint32_t dimension, VectorFn vector,
+                             int build_threads = 1) {
+        validate_build_threads(build_threads);
         validate_forest(source);
         if (dimension == 0) throw std::runtime_error("Zero LVC dimension");
         RecordStore store;
@@ -267,27 +337,66 @@ template <typename Codec> class RecordStore {
         store.offsets.resize(source.parent.size());
         store.lengths.resize(source.parent.size());
 
-        auto append = [&](uint32_t id, const std::vector<typename Codec::StateType> &states) {
-            auto record = encode_record<Codec>(vector(id), dimension, states);
-            store.offsets[id] = store.bytes.size();
-            store.lengths[id] = record.bytes.size();
-            store.bytes.insert(store.bytes.end(), record.bytes.begin(), record.bytes.end());
-            store.patches += record.patches;
-        };
-
         std::vector<uint32_t> order(source.parent.size());
         std::iota(order.begin(), order.end(), 0);
         std::sort(order.begin(), order.end(), [&](uint32_t a, uint32_t b) {
             return source.depth[a] != source.depth[b] ? source.depth[a] < source.depth[b] : a < b;
         });
-        for (uint32_t id : order) {
-            const uint32_t parent = source.parent[id];
-            std::vector<typename Codec::StateType> states(dimension);
-            if (parent != no_parent) {
-                std::vector<float> unused(dimension);
-                store.decode(parent, unused.data(), states);
+        RootStateCache<Codec> root_states;
+        root_states.reserve(source.initial_roots);
+        // Bounded temporary records, independent of the total node count.
+        constexpr size_t batch_size = 4096;
+        for (size_t level_begin = 0; level_begin < order.size();) {
+            size_t level_end = level_begin + 1;
+            while (level_end < order.size() && source.depth[order[level_end]] == source.depth[order[level_begin]])
+                ++level_end;
+            for (size_t begin = level_begin; begin < level_end; begin += batch_size) {
+                const size_t size = std::min(batch_size, level_end - begin);
+                std::vector<EncodedRecord> records(size);
+                std::exception_ptr failure;
+                // Shared payload is immutable throughout this region. Parent
+                // records are in earlier levels and the root cache is read-only.
+#pragma omp parallel for num_threads(build_threads) schedule(static) if(build_threads > 1)
+                for (size_t j = 0; j < size; ++j) {
+                    try {
+                        const uint32_t id = order[begin + j];
+                        std::vector<typename Codec::StateType> states(dimension);
+                        if (source.parent[id] != no_parent) {
+                            std::vector<float> unused(dimension);
+                            store.decode(source.parent[id], unused.data(), states, &root_states);
+                        }
+                        records[j] = encode_record<Codec>(vector(id), dimension, states);
+                    } catch (...) {
+#pragma omp critical(lvc_build_failure)
+                        { if (!failure) failure = std::current_exception(); }
+                    }
+                }
+                if (failure) std::rethrow_exception(failure);
+                size_t end = store.bytes.size();
+                for (size_t j = 0; j < size; ++j) {
+                    const uint32_t id = order[begin + j];
+                    store.offsets[id] = end;
+                    store.lengths[id] = records[j].bytes.size();
+                    end += records[j].bytes.size();
+                    store.patches += records[j].patches;
+                }
+                // No decoder is active while resize can relocate the payload.
+                store.bytes.resize(end);
+#pragma omp parallel for num_threads(build_threads) schedule(static) if(build_threads > 1)
+                for (size_t j = 0; j < size; ++j) {
+                    const uint32_t id = order[begin + j];
+                    std::copy(records[j].bytes.begin(), records[j].bytes.end(),
+                              store.bytes.begin() + store.offsets[id]);
+                }
             }
-            append(id, states);
+            if (source.depth[order[level_begin]] == 0) {
+                // Canonical decoded states, not encoder states or F32 patches.
+                for (size_t j = level_begin; j < level_end; ++j) {
+                    const uint32_t id = order[j];
+                    root_states.insert(id, store.bytes.data() + store.offsets[id], store.lengths[id], dimension);
+                }
+            }
+            level_begin = level_end;
         }
         return store;
     }

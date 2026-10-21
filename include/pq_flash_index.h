@@ -67,6 +67,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     DISKANN_DLLEXPORT void set_cache_payload_mode(uint32_t mode, bool verify = false);
     DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio);
     DISKANN_DLLEXPORT void set_lvc_chain_max(int chain_max);
+    DISKANN_DLLEXPORT void set_lvc_build_threads(int threads);
     DISKANN_DLLEXPORT void sample_cache_budget(const std::vector<uint32_t> &nodes, const std::string &csv_path);
 
 
@@ -240,6 +241,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     bool _verify_cache_payload = false;
     float _lvc_state_cache_ratio = 0.01f;
     int _lvc_chain_max = 2;
+    int _lvc_build_threads = 1;
     double _cache_forest_build_seconds = 0;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>> _dexor_cache;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>> _gorilla_cache;

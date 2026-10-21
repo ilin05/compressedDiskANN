@@ -19,6 +19,16 @@ def build_timings(path):
     return dict(re.findall(r"(\w+)=([^\s]+)", lines[0]))
 
 
+def load_timings(path):
+    result = {}
+    for prefix in ("LVC_LOAD_TIMING ", "LVC_CACHE_LOAD_TIMING "):
+        lines = [line for line in path.read_text().splitlines() if line.startswith(prefix)]
+        if len(lines) != 1:
+            raise ValueError("Expected one {} line; rebuild search_disk_index".format(prefix.strip()))
+        result.update({key: float(value) for key, value in re.findall(r"(\w+)=([^\s]+)", lines[0])})
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("binary", "index-prefix", "query", "output-dir"):
@@ -26,24 +36,28 @@ def main():
     parser.add_argument("--sample-nodes", type=int, default=1000)
     parser.add_argument("--budget-mib", type=float, default=20)
     parser.add_argument("--planning-budget-mib", type=float, default=19.5)
+    parser.add_argument("--expected-points", type=int, default=1000000)
+    parser.add_argument("--build-threads", type=int, default=1)
     args = parser.parse_args()
     budget = int(args.budget_mib * 2**20)
     planning = int(args.planning_budget_mib * 2**20)
-    if not 0 < planning <= budget or not 1 <= args.sample_nodes <= 500000:
+    if (not 0 < planning <= budget or args.build_threads < 1 or args.expected_points < 2 or
+            not 1 <= args.sample_nodes <= args.expected_points // 2):
         parser.error("Invalid sample size or budget")
     out = args.output_dir.absolute()
     out.mkdir(parents=True, exist_ok=True)
     index = str(args.index_prefix.absolute())
     with open(index + "_pq_compressed.bin", "rb") as handle:
         points, pq_dim = struct.unpack("<II", handle.read(8))
-    if points != 1000000 or pq_dim != 32:
-        raise ValueError("Expected BIGANN-1M with 32-byte PQ codes")
-    os.environ.update(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
+    if points != args.expected_points or pq_dim != 32:
+        raise ValueError("Unexpected BIGANN point count or PQ code size (expected 32 bytes)")
+    os.environ.update(OMP_NUM_THREADS=str(args.build_threads), OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     common = [str(args.binary.absolute()), "--data_type", "float", "--dist_fn", "l2",
               "--index_path_prefix", index, "--query_file", str(args.query.absolute()),
               "--gt_file", "null", "-T", "1", "-K", "1", "-L", "1", "-W", "1", "-R", "1",
-              "--lvc_state_cache_ratio", "0.01"]
-    save_json(out / "config.json", dict(index=index, threads=1, budget_bytes=budget,
+              "--lvc_state_cache_ratio", "0.01", "--lvc_build_threads", str(args.build_threads)]
+    save_json(out / "config.json", dict(index=index, threads=1, build_threads=args.build_threads,
+              expected_points=args.expected_points, budget_bytes=budget,
               planning_budget_bytes=planning, sample_nodes=args.sample_nodes, codec="dexor",
               chains=[2, -1], query_search=False, verify_cache=True,
               budget_definition="adjacency + payload + record metadata + state cache; excludes PQ/node lookups"))
@@ -63,7 +77,7 @@ def main():
         tag = "dexor_ch2" if chain == 2 else "dexor_chunbounded"
         row = samples["dexor", chain]
         nodes = select_nodes(row, planning, points // 2)
-        record = dict(case=tag, chain_max=chain, threads=1, planned_nodes=nodes,
+        record = dict(case=tag, chain_max=chain, threads=1, build_threads=args.build_threads, planned_nodes=nodes,
                       budget_bytes=budget, estimated_budget_bytes=estimate(row, nodes)["budget_bytes"],
                       status="failed", error="")
         log = out / (tag + ".log")
@@ -79,6 +93,8 @@ def main():
             timing = build_timings(log)
             if int(timing["nodes"]) != nodes or int(timing["chain_max"]) != chain or int(timing["mode"]) != 2:
                 raise ValueError("Timing configuration mismatch")
+            if int(timing.get("build_threads", 0)) != args.build_threads:
+                raise ValueError("Build thread configuration mismatch")
             stats = budget_from_log(log)
             if not stats or stats["nodes"] != nodes:
                 raise ValueError("Missing or inconsistent cache budget statistics")
@@ -92,10 +108,23 @@ def main():
                           verified_vectors=nodes, status="ok" if used <= budget else "over_budget")
             for key, value in timing.items():
                 record[key] = float(value) if key.endswith("seconds") else int(value)
+            record.update(load_timings(log))
             total = record["forest_seconds"] + record["encode_seconds"]
             for stage in ("root_selection", "propagation", "fallback", "finalize", "encode"):
                 record[stage + "_percent"] = 100 * record[stage + "_seconds"] / total if total else 0
             record["forest_plus_encode_seconds"] = total
+            load = record["total_load_seconds"]
+            record["load_without_verification_seconds"] = load - record["verify_seconds"]
+            record["cache_return_seconds"] = record["cache_data_load_seconds"] - record["cache_total_seconds"]
+            record["load_other_seconds"] = load - record["index_load_seconds"] - record["cache_selection_seconds"] - record["cache_data_load_seconds"]
+            record["process_other_seconds"] = record["process_wall_seconds"] - load
+            # These components are disjoint. Forest sub-stages use forest's
+            # full timer as a separate denominator in the existing columns.
+            for stage in ("index_load", "cache_selection", "cache_read", "remap", "forest", "encode",
+                          "compact", "state", "verify", "cache_other", "cache_return", "load_other",
+                          "root_selection", "propagation", "fallback", "finalize"):
+                seconds = record[stage + "_seconds"]
+                record[stage + "_load_percent"] = 100 * seconds / load if load else 0
             print("{}: roots={:.6f}s propagation={:.6f}s fallback={:.6f}s encode={:.6f}s".format(
                 tag, *(record[key + "_seconds"] for key in
                        ("root_selection", "propagation", "fallback", "encode"))), flush=True)

@@ -58,6 +58,12 @@ unchanged.
 | `process_wall_seconds` | Entire measured subprocess: index/PQ load, BFS, cache I/O/remapping, forest, encoding, state cache, full verification and cleanup |
 
 Encoding excludes the subsequent `shrink_to_fit` and root state-cache creation.
+Encoding now includes a temporary canonical root-state cache used by all child
+encoders. It is released when `RecordStore::build` returns; it is separate from
+the retained query state cache. Records are encoded by depth in batches of 4096,
+then appended in the original depth/ID order. This preserves serial bytes while
+bounding temporary record memory. Peak construction memory can exceed the final
+payload budget, which does not constrain temporary state/raw-vector buffers.
 Sampling is a separate subprocess and is excluded from production timing rows.
 The difference between whole-process time and forest+encoding is **not** pure I/O.
 
@@ -71,7 +77,82 @@ SKIP_BUILD=1 OUTPUT_DIR=/path/to/new/profile_run \
 
 Other supported environment variables are `BUILD_DIR`, `BUILD_THREADS`,
 `DATA_DIR`, `INDEX_PREFIX`, `QUERY_FILE`, `SAMPLE_NODES`, `BUDGET_MIB`, and
-`PLANNING_BUDGET_MIB`. Build parallelism does not change measured run threads.
+`PLANNING_BUDGET_MIB`, and `LVC_BUILD_THREADS` (default 1 for the 1M wrapper).
+Build parallelism does not change measured run threads.
 Each invocation runs afresh and overwrites results in its output directory;
 use different `OUTPUT_DIR` values to retain repeats. A binary without the new
 timing instrumentation is reported as a failed case, never as zero time.
+
+## Parallel BIGANN-1B / 1 GiB profile
+
+First run the small, dataset-independent correctness regression:
+
+```bash
+bash scripts/test_lvc_parallel_build.sh
+```
+
+It checks chains 2/4/8/unbounded, serial vs 32-thread forests, all three codec
+payloads against the original serial encoding, distance ties, disconnected
+fallback nodes, batch boundaries, bitwise recovery and encoding worker errors.
+No extra CMake target is needed; the script compiles the standalone test.
+
+Then profile the existing BIGANN-1B disk index:
+
+```bash
+nohup bash scripts/profile_lvc_disk_forest_bigann_1B.sh \
+  > profile_lvc_disk_forest_bigann_1B_output.log 2>&1 &
+```
+
+Defaults: 1 GiB nominal / 0.975 GiB planning budget, 1M sampled nodes, DeXOR
+chains 2 and unbounded, root/state ratios 1%, up to 32 LVC build threads.
+The same budget exclusions and full cache bitwise checks as above apply. No
+query search is run. Output is
+`scripts/lvc_disk_forest_profile_results/bigann_1B_1GiB/`.
+The original 1B PQ table (~32 GB) must still be loaded in each subprocess;
+1 GiB refers to the cache budget, not process RSS.
+
+Change `lvc_build_threads` in the 1B shell script or set it at launch:
+
+```bash
+LVC_BUILD_THREADS=8 bash scripts/profile_lvc_disk_forest_bigann_1B.sh
+```
+
+`--lvc_build_threads` is independent of query `-T` (kept at 1 in the profiler).
+The CLI defaults to 32; other library callers retain a one-thread default.
+The maximum is configurable; OpenMP runtime limits can yield fewer workers.
+Propagation remains serial. Chain=2 fallback uses an ascending-ID root list and
+parallelizes independent unresolved nodes. Deep-chain fallback keeps assignment
+order serial, parallelizing candidate distances with deterministic distance/ID
+tie breaking using one persistent team.
+
+Additional `summary.csv` timing columns:
+
+- `index_load_seconds`: index/PQ load and thread-context setup.
+- `cache_selection_seconds`: BFS, cache ID sort and hash.
+- `cache_read_seconds`: allocation, disk reads, lookup inserts and vector copies.
+- `remap_seconds`: construction of cached-node local adjacency lists.
+- `compact_seconds`: compressed payload shrink-to-fit.
+- `state_seconds`: retained query root-state cache creation.
+- `verify_seconds`: full cache bitwise correctness check.
+- `cache_other_seconds`: forest statistics/logging and local cleanup inside the
+  measured cache function, excluding the named stages.
+- `cache_return_seconds`: function-return cleanup and caller timing overhead.
+- `load_other_seconds`: remaining caller overhead between measured load stages.
+- `total_load_seconds`: complete index load plus cache selection/construction,
+  including verification but excluding process startup and final destruction.
+- `load_without_verification_seconds`: total load minus correctness checking.
+- `process_other_seconds`: subprocess wall time minus total load, including
+  query-file loading, startup and final destruction; it is not pure I/O.
+
+Each stage has a corresponding `*_load_percent`, relative to total load.
+The disjoint load breakdown sums index_load, cache_selection, cache_read,
+remap, **forest**, encode, compact, state, verify, cache_other, cache_return,
+load_other. Root selection/propagation/fallback/finalize percentages are
+subdivisions of forest; do not add them a second time. Existing `*_percent`
+columns still use forest+encoding as their denominator.
+
+For a thread scaling comparison, use separate `OUTPUT_DIR` paths and identical
+input/sample settings with `LVC_BUILD_THREADS=1` and `32`. Both runs use the
+optimized root-state reuse, so this measures thread scaling, not the benefit of
+root-state reuse alone. These profiles report measured results, not a guaranteed
+32x speedup. An over-budget attempt is recorded without an automatic retry.

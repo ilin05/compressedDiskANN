@@ -462,7 +462,8 @@ void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &n
             diskann::cout << "SAMPLE forest begin chain=" << chain << std::endl;
             Timer forest_timer;
             const auto forest = lvc::build_forest(count, _data_dim,
-                [&](uint32_t id) -> const std::vector<uint32_t>& { return neighbors[id]; }, vector, chain);
+                [&](uint32_t id) -> const std::vector<uint32_t>& { return neighbors[id]; }, vector, chain,
+                nullptr, _lvc_build_threads);
             const double forest_s = forest_timer.elapsed() * 1e-6;
             uint64_t sum_depth = 0, hash = 1469598103934665603ULL;
             uint32_t max_depth = 0;
@@ -488,7 +489,7 @@ void PQFlashIndex<T, LabelT>::sample_cache_budget(const std::vector<uint32_t> &n
                 using Codec = decltype(policy);
                 diskann::cout << "SAMPLE encode begin codec=" << name << " chain=" << chain << std::endl;
                 Timer timer;
-                auto store = lvc::RecordStore<Codec>::build(forest, _data_dim, vector);
+                auto store = lvc::RecordStore<Codec>::build(forest, _data_dim, vector, _lvc_build_threads);
                 store.bytes.shrink_to_fit();
                 const double encode_s = timer.elapsed() * 1e-6;
                 timer.reset();
@@ -534,6 +535,13 @@ void PQFlashIndex<T, LabelT>::set_lvc_chain_max(int chain_max)
 }
 
 template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_lvc_build_threads(int threads)
+{
+    lvc::validate_build_threads(threads);
+    _lvc_build_threads = threads;
+}
+
+template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::set_lvc_state_cache_ratio(float ratio)
 {
     if (!std::isfinite(ratio) || ratio < 0.0f || ratio > 0.01f)
@@ -575,6 +583,9 @@ void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, Q
 
 template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_list(std::vector<uint32_t> &node_list)
 {
+    Timer cache_load_timer;
+    double cache_read_seconds = 0, remap_seconds = 0, compact_seconds = 0;
+    double state_seconds = 0, verify_seconds = 0, encode_seconds = 0;
     _cache_forest_build_seconds = 0;
     if (_cache_payload_mode != 0 &&
         (!std::is_same_v<T, float> || metric != diskann::Metric::L2 || _use_disk_index_pq)) {
@@ -676,8 +687,10 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     }
     diskann::aligned_free(temp_coord_cache_buf);
     _compressed_coord_cache.shrink_to_fit();
+    cache_read_seconds = cache_load_timer.elapsed() * 1e-6;
     if (_cache_payload_mode >= 2) {
         Timer build_timer;
+        Timer remap_timer;
         if (cached_ids.size() != num_cached_nodes)
             throw std::runtime_error("Could not load all LVC disk cache nodes");
         std::vector<std::vector<uint32_t>> neighbors(cached_ids.size());
@@ -689,6 +702,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 if (found != _coord_cache.end()) neighbors[local].push_back(static_cast<uint32_t>(found->second));
             }
         }
+        remap_seconds = remap_timer.elapsed() * 1e-6;
         auto vector = [&](uint32_t id) { return raw_vectors.data() + size_t(id) * _data_dim; };
         diskann::cout << "LVC forest begin nodes=" << cached_ids.size() << " chain=" << _lvc_chain_max << std::endl;
         Timer forest_timer;
@@ -696,7 +710,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
                                               static_cast<uint32_t>(_data_dim),
                                               [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
-                                              vector, _lvc_chain_max, &forest_timings);
+                                              vector, _lvc_chain_max, &forest_timings, _lvc_build_threads);
         _cache_forest_build_seconds = forest_timer.elapsed() * 1e-6;
         uint64_t depth_sum = 0, max_depth = 0, forest_hash = 1469598103934665603ULL;
         for (size_t i = 0; i < forest.parent.size(); ++i) {
@@ -713,21 +727,22 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         Timer encode_timer;
         if (_cache_payload_mode == 2) {
             _dexor_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>>(
-                lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>::build(forest, _data_dim, vector));
+                lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>::build(forest, _data_dim, vector, _lvc_build_threads));
             payload_bytes = _dexor_cache->bytes.size(); patches = _dexor_cache->patches;
         } else if (_cache_payload_mode == 3) {
             _gorilla_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>>(
-                lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>::build(forest, _data_dim, vector));
+                lvc::RecordStore<hnswlib::codecs::GorillaCodecPolicy>::build(forest, _data_dim, vector, _lvc_build_threads));
             payload_bytes = _gorilla_cache->bytes.size(); patches = _gorilla_cache->patches;
         } else {
             _elf_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>>(
-                lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector));
+                lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector, _lvc_build_threads));
             payload_bytes = _elf_cache->bytes.size(); patches = _elf_cache->patches;
         }
-        const double encode_seconds = encode_timer.elapsed() * 1e-6;
+        encode_seconds = encode_timer.elapsed() * 1e-6;
         diskann::cout << std::setprecision(12)
                       << "LVC_BUILD_TIMING nodes=" << cached_ids.size() << " chain_max=" << _lvc_chain_max
                       << " mode=" << _cache_payload_mode << " roots=" << forest.initial_roots
+                      << " build_threads=" << _lvc_build_threads
                       << " rounds=" << forest.propagation_rounds << " fallback_nodes=" << forest.fallback_nodes
                       << " root_selection_seconds=" << forest_timings.root_selection_seconds
                       << " propagation_seconds=" << forest_timings.propagation_seconds
@@ -735,9 +750,12 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                       << " finalize_seconds=" << forest_timings.finalize_seconds
                       << " forest_seconds=" << _cache_forest_build_seconds
                       << " encode_seconds=" << encode_seconds << std::endl;
+        Timer compact_timer;
         if (_dexor_cache) _dexor_cache->bytes.shrink_to_fit();
         if (_gorilla_cache) _gorilla_cache->bytes.shrink_to_fit();
         if (_elf_cache) _elf_cache->bytes.shrink_to_fit();
+        compact_seconds = compact_timer.elapsed() * 1e-6;
+        Timer state_timer;
         _dexor_state_cache.reset();
         _gorilla_state_cache.reset();
         _elf_state_cache.reset();
@@ -774,6 +792,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 fill_cache(*_elf_state_cache, *_elf_cache);
             }
         }
+        state_seconds = state_timer.elapsed() * 1e-6;
         const uint64_t metadata_bytes = cached_ids.size() * (sizeof(uint32_t) + sizeof(uint8_t) +
                                                                2 * sizeof(uint64_t));
         const uint64_t raw_bytes = raw_vectors.size() * sizeof(float);
@@ -788,6 +807,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                       << " state_cache_payload_bytes=" << state_cache_bytes
                       << " build_seconds=" << build_timer.elapsed_seconds() << std::endl;
         if (_verify_cache_payload) {
+            Timer verify_timer;
             std::vector<T> decoded(_aligned_dim);
             for (size_t local = 0; local < cached_ids.size(); ++local) {
                 decode_cache_vector(cached_ids[local], decoded.data());
@@ -810,8 +830,18 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
             diskann::cout << "LVC disk cache PASS bitwise vectors=" << cached_ids.size() << "/"
                           << cached_ids.size() << " coordinates=" << raw_vectors.size() << "/"
                           << raw_vectors.size() << std::endl;
+            verify_seconds = verify_timer.elapsed() * 1e-6;
         }
     }
+    const double cache_total_seconds = cache_load_timer.elapsed() * 1e-6;
+    diskann::cout << std::setprecision(12)
+                  << "LVC_CACHE_LOAD_TIMING cache_read_seconds=" << cache_read_seconds
+                  << " remap_seconds=" << remap_seconds << " compact_seconds=" << compact_seconds
+                  << " state_seconds=" << state_seconds << " verify_seconds=" << verify_seconds
+                  << " cache_total_seconds=" << cache_total_seconds
+                  << " cache_other_seconds=" << cache_total_seconds - cache_read_seconds - remap_seconds -
+                     _cache_forest_build_seconds - encode_seconds - compact_seconds - state_seconds - verify_seconds
+                  << std::endl;
     diskann::cout << "..done." << std::endl;
 }
 
