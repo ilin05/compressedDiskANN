@@ -692,10 +692,11 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         auto vector = [&](uint32_t id) { return raw_vectors.data() + size_t(id) * _data_dim; };
         diskann::cout << "LVC forest begin nodes=" << cached_ids.size() << " chain=" << _lvc_chain_max << std::endl;
         Timer forest_timer;
+        lvc::ForestBuildTimings forest_timings;
         const auto forest = lvc::build_forest(static_cast<uint32_t>(cached_ids.size()),
                                               static_cast<uint32_t>(_data_dim),
                                               [&](uint32_t id) -> const std::vector<uint32_t> & { return neighbors[id]; },
-                                              vector, _lvc_chain_max);
+                                              vector, _lvc_chain_max, &forest_timings);
         _cache_forest_build_seconds = forest_timer.elapsed() * 1e-6;
         uint64_t depth_sum = 0, max_depth = 0, forest_hash = 1469598103934665603ULL;
         for (size_t i = 0; i < forest.parent.size(); ++i) {
@@ -709,6 +710,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                       << " forest_seconds=" << _cache_forest_build_seconds << std::endl;
         uint64_t payload_bytes = 0, patches = 0;
         diskann::cout << "LVC encode begin mode=" << _cache_payload_mode << std::endl;
+        Timer encode_timer;
         if (_cache_payload_mode == 2) {
             _dexor_cache = std::make_unique<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>>(
                 lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>::build(forest, _data_dim, vector));
@@ -722,6 +724,17 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 lvc::RecordStore<hnswlib::codecs::ElfCodecPolicy>::build(forest, _data_dim, vector));
             payload_bytes = _elf_cache->bytes.size(); patches = _elf_cache->patches;
         }
+        const double encode_seconds = encode_timer.elapsed() * 1e-6;
+        diskann::cout << std::setprecision(12)
+                      << "LVC_BUILD_TIMING nodes=" << cached_ids.size() << " chain_max=" << _lvc_chain_max
+                      << " mode=" << _cache_payload_mode << " roots=" << forest.initial_roots
+                      << " rounds=" << forest.propagation_rounds << " fallback_nodes=" << forest.fallback_nodes
+                      << " root_selection_seconds=" << forest_timings.root_selection_seconds
+                      << " propagation_seconds=" << forest_timings.propagation_seconds
+                      << " fallback_seconds=" << forest_timings.fallback_seconds
+                      << " finalize_seconds=" << forest_timings.finalize_seconds
+                      << " forest_seconds=" << _cache_forest_build_seconds
+                      << " encode_seconds=" << encode_seconds << std::endl;
         if (_dexor_cache) _dexor_cache->bytes.shrink_to_fit();
         if (_gorilla_cache) _gorilla_cache->bytes.shrink_to_fit();
         if (_elf_cache) _elf_cache->bytes.shrink_to_fit();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <numeric>
@@ -14,6 +15,14 @@
 namespace diskann::lvc {
 
 constexpr uint32_t no_parent = UINT32_MAX;
+
+// Coarse wall-clock timers only: no timing calls in node/distance loops.
+struct ForestBuildTimings {
+    double root_selection_seconds = 0; // Includes allocation and root initialization.
+    double propagation_seconds = 0;
+    double fallback_seconds = 0;
+    double finalize_seconds = 0; // Parent materialization and validation.
+};
 
 struct Forest {
     std::vector<uint32_t> parent; // Local node IDs; no_parent marks a root.
@@ -94,9 +103,16 @@ inline void validate_forest(const Forest &forest) {
 // filter neighbors to cached nodes and map global IDs to local IDs first.
 template <typename NeighborFn, typename VectorFn>
 Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn vector,
-                    int chain_max = 2) {
+                    int chain_max = 2, ForestBuildTimings *timings = nullptr) {
     if (count == 0 || dim == 0) throw std::runtime_error("Empty LVC forest input");
     if (chain_max != -1 && chain_max < 2) throw std::runtime_error("LVC chain_max must be -1 or >= 2");
+    using Clock = std::chrono::steady_clock;
+    auto stage_start = Clock::now();
+    auto finish_stage = [&](double ForestBuildTimings::*field) {
+        const auto now = Clock::now();
+        if (timings) timings->*field = std::chrono::duration<double>(now - stage_start).count();
+        stage_start = now;
+    };
     Forest forest;
     forest.parent.assign(count, no_parent);
     forest.depth.assign(count, 0);
@@ -119,6 +135,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         assigned[root] = root;
         min_dist[root] = 0;
     }
+    finish_stage(&ForestBuildTimings::root_selection_seconds);
 
     auto distance = [&](uint32_t a, uint32_t b) {
         const float *va = vector(a);
@@ -157,6 +174,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
                 }
             }
         }
+        finish_stage(&ForestBuildTimings::propagation_seconds);
         // Match HNSW's fallback: scan already assigned nodes with room in the
         // chain. A root is always eligible, so root count remains fixed.
         for (uint32_t i = 0; i < count; ++i) {
@@ -173,7 +191,9 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
             visited[i] = 1;
             ++forest.fallback_nodes;
         }
+        finish_stage(&ForestBuildTimings::fallback_seconds);
         validate_forest(forest);
+        finish_stage(&ForestBuildTimings::finalize_seconds);
         return forest;
     }
 
@@ -199,6 +219,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         }
     }
 
+    finish_stage(&ForestBuildTimings::propagation_seconds);
     // Only nodes unreached by propagation scan all initial roots.
     for (uint32_t i = 0; i < count; ++i) {
         if (is_root[i] || assigned[i] != no_parent) continue;
@@ -214,6 +235,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         if (assigned[i] == no_parent) throw std::runtime_error("No finite LVC root distance");
         ++forest.fallback_nodes;
     }
+    finish_stage(&ForestBuildTimings::fallback_seconds);
 
     for (uint32_t i = 0; i < count; ++i) {
         if (!is_root[i]) {
@@ -222,6 +244,7 @@ Forest build_forest(uint32_t count, uint32_t dim, NeighborFn neighbors, VectorFn
         }
     }
     validate_forest(forest);
+    finish_stage(&ForestBuildTimings::finalize_seconds);
     return forest;
 }
 
