@@ -1,0 +1,17 @@
+{
+  "index": "/home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2",
+  "threads": 1,
+  "build_threads": 32,
+  "expected_points": 1000000000,
+  "budget_bytes": 1073741824,
+  "planning_budget_bytes": 1046898278,
+  "sample_nodes": 1000000,
+  "codec": "dexor",
+  "chains": [
+    -1
+  ],
+  "fallback_root_candidates": 1,
+  "query_search": false,
+  "verify_cache": true,
+  "budget_definition": "adjacency + payload + record metadata + state cache; excludes PQ/node lookups"
+}
