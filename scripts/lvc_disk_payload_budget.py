@@ -3,7 +3,9 @@
 import argparse
 import json
 import math
+import os
 from pathlib import Path
+import re
 import struct
 
 from lvc_disk_sampled_budget import (budget_from_log, compare_results, csv_rows,
@@ -22,7 +24,37 @@ FIELDS = ("case", "codec", "chain_max", "status", "error", "exit_code", "within_
           "forest_build_seconds", "total_load_seconds", "process_wall_seconds", "k", "L", "threads",
           "beamwidth", "rounds", "recall_at_1_percent", "qps", "mean_us", "p999_us", "mean_ios",
           "peak_rss_after_cache_kib", "current_rss_after_cache_kib", "peak_rss_after_search_kib",
-          "current_rss_after_search_kib", "result_bits_match_raw", "extra_candidate_filtering")
+          "current_rss_after_search_kib", "result_bits_match_raw", "extra_candidate_filtering",
+          "build_threads", "fallback_root_candidates", "propagation_rounds", "fallback_nodes",
+          "root_selection_seconds", "propagation_seconds", "fallback_seconds", "finalize_seconds", "encode_seconds",
+          "fallback_bucket_seconds", "fallback_root_search_seconds", "fallback_tree_search_seconds",
+          "fallback_root_distances", "fallback_tree_distances", "fallback_max_tree_nodes",
+          "cache_read_seconds", "remap_seconds", "compact_seconds", "state_seconds", "verify_seconds",
+          "cache_other_seconds", "load_without_verification_seconds")
+
+
+def phase_timings(log, chain, threads, policy, required):
+    text = log.read_text(errors="replace").splitlines()
+    values = {}
+    prefixes = ["LVC_LOAD_TIMING ", "LVC_CACHE_LOAD_TIMING "]
+    if chain:
+        prefixes.append("LVC_BUILD_TIMING ")
+    for prefix in prefixes:
+        lines = [line for line in text if line.startswith(prefix)]
+        if len(lines) != 1:
+            if required:
+                raise ValueError("Missing/duplicate {}: rebuild search_disk_index".format(prefix.strip()))
+            continue
+        parsed = dict(re.findall(r"(\w+)=([^\s]+)", lines[0]))
+        if prefix == "LVC_BUILD_TIMING ":
+            if (int(parsed["build_threads"]) != threads or int(parsed["fallback_root_candidates"]) != policy or
+                    int(parsed["chain_max"]) != chain):
+                raise ValueError("Production forest policy/thread configuration mismatch")
+        for key, value in parsed.items():
+            target = {"rounds": "propagation_rounds", "forest_seconds": "forest_build_seconds"}.get(key, key)
+            if target in FIELDS and target not in ("chain_max", "roots"):
+                values[target] = float(value) if target.endswith("seconds") else int(value)
+    return values
 
 
 def estimate(row, nodes):
@@ -75,6 +107,9 @@ def main():
     parser.add_argument("--budget-mib", type=float, default=20 * 1024)
     parser.add_argument("--planning-budget-mib", type=float, default=19.5 * 1024)
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--build-threads", type=int, default=1)
+    parser.add_argument("--fallback-root-candidates", type=int, choices=[0, 1], default=1)
+    parser.add_argument("--require-phase-timings", action="store_true")
     parser.add_argument("--L", nargs="+", type=int, default=[1, 2, 3, 4, 5, 6, 8, 10])
     parser.add_argument("--rounds", type=int, default=10)
     parser.add_argument("--beamwidth", type=int, default=2)
@@ -85,10 +120,11 @@ def main():
     args = parser.parse_args()
     nominal = int(args.budget_mib * (1 << 20))
     target = int(args.planning_budget_mib * (1 << 20))
-    if (not 0 < target <= nominal or min(args.sample_nodes, args.threads, args.rounds, args.beamwidth) < 1 or
+    if (not 0 < target <= nominal or min(args.sample_nodes, args.threads, args.build_threads, args.rounds, args.beamwidth) < 1 or
             not args.L or min(args.L) < 1 or len(args.L) != len(set(args.L)) or
             not 0 <= args.state_cache_ratio <= .01 or (args.check_results and args.beamwidth != 1)):
         parser.error("Invalid budget/search parameters; bitwise comparison requires beamwidth=1")
+    os.environ.update(OMP_NUM_THREADS=str(args.build_threads), OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     # Preserve the provided path spelling (the workspace may use case aliases).
     out = args.output_dir.absolute()
     out.mkdir(parents=True, exist_ok=True)
@@ -105,14 +141,23 @@ def main():
               "--index_path_prefix", index, "--query_file", str(args.query.absolute()),
               "--gt_file", str(args.gt.absolute()), "-T", str(args.threads), "-K", "1",
               "-L", *map(str, args.L), "-W", str(args.beamwidth), "-R", str(args.rounds),
-              "--lvc_state_cache_ratio", str(args.state_cache_ratio)]
+              "--lvc_state_cache_ratio", str(args.state_cache_ratio), "--lvc_build_threads", str(args.build_threads),
+              "--lvc_fallback_root_candidates", str(args.fallback_root_candidates)]
     identity = {}
     paths = {"binary": args.binary, "disk": Path(index + "_disk.index"), "pq": pq,
              "pivots": Path(index + "_pq_pivots.bin"), "query": args.query, "gt": args.gt}
     for name, path in paths.items():
         stat = path.stat()
         identity[name] = [str(path.absolute()), stat.st_size, stat.st_mtime_ns]
-    sample_identity = dict(identity, sample_nodes=args.sample_nodes, state_ratio=args.state_cache_ratio)
+    sample_identity = dict(identity, sample_nodes=args.sample_nodes, state_ratio=args.state_cache_ratio,
+                           build_threads=args.build_threads, fallback_root_candidates=args.fallback_root_candidates)
+    save_json(out / "config.json", dict(index=index, query=str(args.query.absolute()), gt=str(args.gt.absolute()),
+              budget_bytes=nominal, planning_budget_bytes=target, sample_nodes=args.sample_nodes,
+              build_threads=args.build_threads, search_threads=args.threads, k=1, L=args.L, rounds=args.rounds,
+              beamwidth=args.beamwidth, state_cache_ratio=args.state_cache_ratio,
+              fallback_root_candidates=args.fallback_root_candidates, verify_cache=args.verify_cache,
+              require_phase_timings=args.require_phase_timings, cases=list(CASES),
+              budget_definition="adjacency + payload + record metadata + state cache; excludes PQ/node lookups"))
     save_json(out / "run_status.json", dict(status="running", budget_definition="non_pq_non_lookup",
               nominal_budget_bytes=nominal, planning_budget_bytes=target, cases=list(CASES)))
     sample_csv, sample_stamp = out / "sample.csv", out / "sample.ok.json"
@@ -127,6 +172,10 @@ def main():
         temporary.replace(sample_csv)
         save_json(sample_stamp, sample_identity)
     samples = verify_samples(csv_rows(sample_csv), args.sample_nodes)
+    for row in samples.values():
+        if ((args.require_phase_timings and "fallback_root_candidates" not in row) or
+                int(row.get("fallback_root_candidates", args.fallback_root_candidates)) != args.fallback_root_candidates):
+            raise ValueError("Sample forest policy mismatch; rebuild search_disk_index")
     plans, summary, failed = [], [], []
     raw_prefix = out / "raw"
     raw_reference_ready = False
@@ -141,7 +190,8 @@ def main():
         save_csv(out / "node_plans.csv", plans)
         signature = dict(sample_identity, budget_definition="non_pq_non_lookup_v1", codec=codec, chain=chain,
                          nominal=nominal, target=target, L=args.L, threads=args.threads, rounds=args.rounds,
-                         beamwidth=args.beamwidth, verify=args.verify_cache, compare=args.check_results)
+                         beamwidth=args.beamwidth, verify=args.verify_cache, compare=args.check_results,
+                         require_phase_timings=args.require_phase_timings)
         stamp, prefix = out / (tag + ".done.json"), out / tag
         destination = out / (tag + "_results.csv")
         if args.resume and stamp.exists() and destination.exists() and json.loads(stamp.read_text()) == signature:
@@ -156,6 +206,7 @@ def main():
                         pq_file_bytes=pq.stat().st_size, sample_nodes=args.sample_nodes,
                         sample_payload_ratio_f32=int(row["nodes"]) * int(row["dim"]) * 4 / int(row["payload_bytes"]),
                         k=1, threads=args.threads, beamwidth=args.beamwidth, rounds=args.rounds,
+                        build_threads=args.build_threads, fallback_root_candidates=args.fallback_root_candidates,
                         extra_candidate_filtering=0)
             rows = []
             source = Path(str(prefix) + "_search_summary.csv")
@@ -196,8 +247,16 @@ def main():
                             peak_rss_after_search_kib=result["RSS_After_Search(KB)"],
                             current_rss_after_search_kib=result["Current_RSS_After_Search(KB)"])
                         rows.append(record)
+                phases = phase_timings(log, chain, args.build_threads, args.fallback_root_candidates,
+                                       args.require_phase_timings)
+                for record in rows:
+                    record.update(phases)
+                    record["load_without_verification_seconds"] = (
+                        float(record["total_load_seconds"]) - float(record.get("verify_seconds", 0)))
                 if code or not actual or actual["nodes"] != selected or [int(r["L"]) for r in rows] != args.L:
                     raise RuntimeError("Incomplete/failed attempt: {}".format(log))
+                if any(not str(r["recall_at_1_percent"]).strip() for r in rows):
+                    raise RuntimeError("Missing ground-truth recall@1")
                 if args.check_results and tag != "raw":
                     if not raw_reference_ready:
                         raise RuntimeError("Raw reference attempt failed; cannot validate against stale result files")

@@ -55,8 +55,11 @@ Completed attempts, including failures, are reused with RESUME=1 (default) when
 input/config/binary signatures match. To rerun, use RESUME=0 or remove only the
 selected case's `.done.json`. Binary changes invalidate prior signatures.
 
-Both scripts use K=1, L=1,2,3,4,5,6,8,10, 10 rounds, one thread, and 1% root state
-cache. No extra candidate-filtering optimization is enabled; DiskANN's native PQ
+Both scripts use K=1, L=1,2,3,4,5,6,8,10 and 1% root state cache. The 1M script
+keeps 10 rounds and one build/search thread. The 1B script now defaults to
+**32 LVC build threads, one query thread, and 3 rounds**. Build thread count is
+explicitly passed independently from query `-T`; propagation and cache reading
+retain their existing implementation. No extra candidate-filtering optimization is enabled; DiskANN's native PQ
 navigation remains. 1M uses beamwidth=1 and checks all differential cache vectors
 bitwise plus all codecs' final IDs/L2 bits against Raw. 1B uses beamwidth=2 and
 does not require identical result bits across asynchronous search executions.
@@ -74,6 +77,8 @@ Default folders: `scripts/lvc_disk_payload_budget_results/bigann_1M` and
 - `CASE_attempt0.log`, `.timing.json`: live subprocess log and wall time.
 - `CASE_search_summary.csv`: original search metrics from C++.
 - `CASE.done.json`, `run_status.json`: configuration signatures and completion.
+- `config.json`: budget, codec order, build/search threads, search parameters,
+  input paths and fallback policy.
 
 Each result records nominal/planning/actual budget, budget utilization,
 within-budget flag, planned/actual nodes, every counted component, excluded
@@ -94,8 +99,72 @@ Forest time is a subset of cache load, not an additional term to add to total.
 The shared sample profiling is a separate preparation cost in sample timing/log;
 it is not silently charged once per final codec. Loading, forest construction
 and allocator high-water RSS may still be large/slow: excluding lookup from the
-budget does not eliminate those costs. No forest algorithm has been changed.
+budget does not eliminate those costs. The current unbounded fallback policy
+is documented below.
+
+## Current 20 GiB BIGANN-1B full run
+
+```bash
+nohup bash scripts/test_lvc_disk_payload_budget_bigann_1B.sh \
+  > test_lvc_disk_payload_budget_bigann_1B_output.log 2>&1 &
+```
+
+The script rebuilds `search_disk_index` by default, samples 1M cached nodes once,
+then executes exactly this order:
+
+```text
+raw
+alp
+dexor_ch2
+gorilla_ch2
+elf_ch2
+dexor_chunbounded
+gorilla_chunbounded
+elf_chunbounded
+```
+
+Each production group loads once and runs all eight L values for three rounds:
+`-K 1 -L 1 2 3 4 5 6 8 10 -T 1 -R 3 -W 2`. The nominal budget is 20 GiB;
+planning uses 19.5 GiB. Initial roots are degree-selected 1%; query state cache
+defaults to 1%. Raw/ALP do not use differential forest/state caches.
+
+Unbounded differential fallback uses the current **nearest-root tree k=1**
+policy, explicitly passed to both sampling and production. Bounded chain=2
+retains its root-child policy. Root state reuse and parallel fallback/encoding
+are enabled by the current backend. Other scripts keep their existing behavior
+unless supplied the new parameters.
+
+After every group, `CASE_results.csv` and cumulative `summary.csv` are written
+with atomic replacement, before the next group starts. A normal complete run
+contains 64 summary rows (8 groups x 8 L values). Original application reports,
+result binaries, full logs and subprocess timing JSON are retained. Failed
+groups save a failure row or available partial rows and execution continues;
+over-budget groups still search and are marked `over_budget`, without retries.
+
+The 1B wrapper requires the current phase/policy metadata, so a stale binary
+cannot silently substitute older forest logic. Completed matching attempts are
+reused with `RESUME=1`; changed build threads, policy, search settings or binary
+invalidate the corresponding signatures. Use `RESUME=0` for a fresh run.
+
+Additional CSV columns include `build_threads`, `fallback_root_candidates`,
+`root_selection_seconds`, `propagation_seconds`, `fallback_seconds`,
+`finalize_seconds`, `encode_seconds`, nearest-root/bucket search times and
+distance counts, cache-read/remap/state-cache/verification times, and
+`load_without_verification_seconds`. `propagation_rounds` is the forest iteration
+count; **`rounds` always means query repetitions** (3 by default on 1B).
+Load timing repeats across a group's L rows and should be counted once per group.
+
+By default `VERIFY_CACHE=0` avoids a full extra decoding pass during performance
+measurement. Set `VERIFY_CACHE=1` to include it, timed separately. Set
+`LVC_BUILD_THREADS=8` to adjust the build maximum; query threads remain 1.
+
+Local fixture checks (no ANN performance measurements):
+
+```bash
+python3 scripts/test_lvc_disk_payload_budget.py
+python3 scripts/test_lvc_disk_payload_budget_1B.py
+```
 
 Environment overrides: BUILD_DIR, DATA_DIR, INDEX_PREFIX, QUERY_FILE, GT_FILE,
 OUTPUT_DIR, SAMPLE_NODES, BUDGET_MIB, PLANNING_BUDGET_MIB, STATE_CACHE_RATIO,
-ROUNDS, BUILD_THREADS, SKIP_BUILD, RESUME; 1B also PERF_W and VERIFY_CACHE.
+ROUNDS, BUILD_THREADS, SKIP_BUILD, RESUME; 1B also LVC_BUILD_THREADS, PERF_W and VERIFY_CACHE.
