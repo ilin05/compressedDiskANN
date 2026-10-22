@@ -7,6 +7,31 @@ bash scripts/test_lvc_disk_payload_budget_bigann_1M.sh
 nohup bash scripts/test_lvc_disk_payload_budget_bigann_1B.sh > test_lvc_disk_payload_budget_bigann_1B.log 2>&1 &
 ```
 
+For recall@10 on BIGANN-1B:
+
+```bash
+nohup bash scripts/test_lvc_disk_payload_budget_bigann_1B_k10.sh \
+  > test_lvc_disk_payload_budget_bigann_1B_k10.log 2>&1 &
+```
+
+The K=10 wrapper uses `-K 10 -L 10 11 12 13 14 16 18 20 -T 1 -R 3 -W 2`.
+Other budget, sampling, 32-thread loading, state-cache and codec-order settings
+match the K=1 wrapper. Its independent output directory is
+`scripts/lvc_disk_payload_budget_results/bigann_1B_k10/`; each case is saved
+before the next begins, with 64 summary rows after all eight cases. Recall is
+written as `recall_at_10_percent`, parsed from native `Recall@10`. Native
+DiskANN's recall definition is retained. K participates in resume validation;
+K=1 results cannot be reused as K=10. The original K=1 wrapper and CSV header
+remain compatible. The Python driver accepts `--k` (default 1), requires every
+L>=K, and accepts load timing markers after progress text on the same log line.
+
+Runtime planning from the existing 20-GiB K=1 measurements: loading all eight
+cases took 7.62 hours. Estimating query latency proportional to L around each
+case's measured L=10 yields about 1.37 hours for the eight new L values, three
+rounds and 10,000 queries. Total load plus query time is about 9.0 hours; allow
+**9–11 hours** under comparable conditions. This extrapolation is not a K=10
+measurement; I/O contention and forest-build variability can extend runtime.
+
 Existing sampled/full-cache-budget scripts are unchanged. These new scripts use
 MiB/GiB (powers of 1024): 1M nominal **20 MiB**, planning **19.5 MiB**;
 1B nominal **20 GiB**, planning **19.5 GiB**.

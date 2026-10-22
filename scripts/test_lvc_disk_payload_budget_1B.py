@@ -29,11 +29,21 @@ if ordinal:
 
 class FullBudgetWrapperTests(unittest.TestCase):
     def test_order_threads_rounds_phases_persistence_and_resume(self):
+        self.exercise_wrapper(k=1)
+
+    def test_k10_wrapper_recall_columns_and_resume(self):
+        self.exercise_wrapper(k=10)
+
+    def exercise_wrapper(self, k):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / 'apps').mkdir()
             binary = root / 'apps/search_disk_index'
-            binary.write_text(FIXTURE.replace('rounds=3 fallback_nodes', 'rounds=8 fallback_nodes') + CHECK_PREVIOUS)
+            fixture = FIXTURE.replace('rounds=3 fallback_nodes', 'rounds=8 fallback_nodes')
+            fixture = fixture.replace("'Recall@1'", "'Recall@{}'".format(k))
+            # Exercise the progress-line prefix that occurs in real raw/ALP logs.
+            fixture = fixture.replace("print('LVC_CACHE_LOAD_TIMING ", "print('Loading the cache list into memory..LVC_CACHE_LOAD_TIMING ")
+            binary.write_text(fixture + CHECK_PREVIOUS)
             binary.chmod(0o755)
             index = root / 'index'
             Path(str(index) + '_disk.index').write_bytes(b'disk')
@@ -50,7 +60,8 @@ class FullBudgetWrapperTests(unittest.TestCase):
             environment.update(SKIP_BUILD='1', BUILD_DIR=str(root), INDEX_PREFIX=str(index),
                                QUERY_FILE=str(query), GT_FILE=str(truth), OUTPUT_DIR=str(root / 'out'),
                                LVC_BUILD_THREADS='32', RESUME='1', VERIFY_CACHE='0', PERF_W='2')
-            wrapper = Path(__file__).with_name('test_lvc_disk_payload_budget_bigann_1B.sh')
+            wrapper = Path(__file__).with_name('test_lvc_disk_payload_budget_bigann_1B' +
+                                               ('_k10' if k == 10 else '') + '.sh')
             command = ['bash', str(wrapper)]
             first = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             self.assertEqual(first.returncode, 0, first.stdout)
@@ -61,14 +72,19 @@ class FullBudgetWrapperTests(unittest.TestCase):
                               for c in calls[1:]], list(CASES))
             for call in calls:
                 for flag, value in (('-T', '1'), ('-R', '3'), ('--lvc_build_threads', '32'),
-                                    ('--lvc_fallback_root_candidates', '1')):
+                                    ('--lvc_fallback_root_candidates', '1'), ('-K', str(k))):
                     self.assertEqual(call['rest'][call['rest'].index(flag) + 1], value)
                 self.assertNotIn('--cache_budget_probe_only', call['rest'])
             rows = list(csv.DictReader((root / 'out/summary.csv').read_text().splitlines()))
             self.assertEqual(len(rows), 64)
-            self.assertEqual([int(r['L']) for r in rows[:8]], [1, 2, 3, 4, 5, 6, 8, 10])
+            self.assertEqual([int(r['L']) for r in rows[:8]],
+                             [1, 2, 3, 4, 5, 6, 8, 10] if k == 1 else [10, 11, 12, 13, 14, 16, 18, 20])
             for row in rows:
                 self.assertNotEqual(row['status'], 'failed')
+                self.assertEqual(int(row['k']), k)
+                self.assertEqual(row['recall_at_{}_percent'.format(k)], '1')
+                if k == 10:
+                    self.assertNotIn('recall_at_1_percent', row)
                 self.assertEqual(int(row['rounds']), 3)
                 self.assertEqual(int(row['budget_bytes']), 20 * 2**30)
                 self.assertEqual(float(row['cache_read_seconds']), 0.1)
@@ -78,6 +94,16 @@ class FullBudgetWrapperTests(unittest.TestCase):
             second = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             self.assertEqual(second.returncode, 0, second.stdout)
             self.assertEqual(len((root / 'apps/calls.jsonl').read_text().splitlines()), 9)
+            if k == 10:
+                stamp = root / 'out/raw.done.json'
+                signature = json.loads(stamp.read_text())
+                self.assertEqual(signature['k'], 10)
+                signature['k'] = 1
+                stamp.write_text(json.dumps(signature))
+                third = subprocess.run(command, env=environment, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT, text=True)
+                self.assertEqual(third.returncode, 0, third.stdout)
+                self.assertEqual(len((root / 'apps/calls.jsonl').read_text().splitlines()), 10)
 
 
 if __name__ == '__main__':
