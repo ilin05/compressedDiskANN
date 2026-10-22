@@ -1,0 +1,11 @@
+{
+  "status": "complete_with_failures",
+  "failed_cases": [
+    "raw",
+    "alp"
+  ],
+  "nominal_budget_bytes": 21474836480,
+  "planning_budget_bytes": 20937965568,
+  "budget_definition": "non_pq_non_lookup",
+  "attempts_per_case": 1
+}
