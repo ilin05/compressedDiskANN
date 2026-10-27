@@ -141,9 +141,18 @@ public:
     static inline void encode_dexor(double value, StateT& state, utils::MemoryStreamWriter& writer) {
         using namespace encoding_algorithm::dexor;
         int q = DeXORTools::getEnd(value, state.dexor.previous_q);
+        // The decimal exponent occupies five bits (q + 20). Keep unsupported
+        // exponents on the codec's existing raw exception path.
+        if (q < -20 || q > 11) {
+            writer.write(true);
+            writer.write(true);
+            dexor_exception_handle(value, state, writer);
+            return;
+        }
         int delta = 0;
         double alpha = 0;
         while (delta < 16) {
+            if (q + delta > 23) { delta = 16; break; }
             double pow = DeXORTools::getP10(q + delta);
             long long a = DeXORTools::truncate(value / pow);
             long long b = DeXORTools::truncate(state.dexor.previous_value / pow);

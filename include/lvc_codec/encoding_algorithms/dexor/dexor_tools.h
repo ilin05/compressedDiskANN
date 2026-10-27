@@ -77,19 +77,27 @@ namespace dexor {
         inline int getEnd(double value, int last_end) {
             if (comp(value, 0, EQUAL_EPS) == 0) return 0;
             if (last_end < -12) return getEnd_HP(value, last_end);
+            // A nonzero value rounding to zero is not an integer at this scale.
+            // Otherwise small normalized coordinates keep increasing q forever
+            // and eventually read beyond P10. Out-of-format q uses raw escape.
+            const auto scaled_integer = [](double scaled) {
+                return isInt(scaled, INTEGER_EPS) && std::round(scaled) != 0;
+            };
             int q = last_end;
             double vq = value / getP10(q);
-            if (isInt(vq, INTEGER_EPS)) {
+            if (scaled_integer(vq)) {
                 vq = value / getP10(q + 1);
-                while (isInt(vq, INTEGER_EPS)) {
+                while (scaled_integer(vq)) {
                     q++;
+                    if (q > 11) return q;
                     vq = value / getP10(q + 1);
                 }
                 return q;
             } else {
                 q--;
                 vq = value / getP10(q);
-                while (!isInt(vq, INTEGER_EPS)) {
+                while (!scaled_integer(vq)) {
+                    if (q <= -20) return -21;
                     q--;
                     vq = value / getP10(q);
                 }

@@ -26,20 +26,26 @@ template <typename Codec>
 void convert_codec(const char *name, uint32_t mode, const std::string &source,
                    const std::string &output, const diskann::lvc::Forest &forest,
                    const std::vector<float> &vectors, uint32_t count, uint32_t dim,
-                   bool compression_only, std::ofstream &stats, double mean_reference_l2,
+                   bool compression_only, int threads, std::ofstream &stats, double mean_reference_l2,
                    double p50_reference_l2, double p95_reference_l2,
                    double average_depth, double average_nonroot_depth, uint32_t max_depth) {
     const auto start = std::chrono::steady_clock::now();
     const auto vector = [&](uint32_t id) { return vectors.data() + uint64_t(id) * dim; };
-    auto store = diskann::lvc::RecordStore<Codec>::build(forest, dim, vector);
+    std::cout << "LVC codec=" << name << " phase=encode_begin chain_max_depth=" << max_depth << '\n';
+    auto store = diskann::lvc::RecordStore<Codec>::build(forest, dim, vector, threads);
+    std::cout << "LVC codec=" << name << " phase=encode_done bytes=" << store.bytes.size() << '\n';
     const std::string prefix = output + "_" + name;
     if (compression_only) {
+        std::cout << "LVC codec=" << name << " phase=verify_begin nodes=" << count << '\n';
         std::vector<float> decoded(dim);
         for (uint32_t id = 0; id < count; ++id) {
             store.decode(id, decoded.data());
             if (std::memcmp(decoded.data(), vector(id), dim * sizeof(float)) != 0)
                 throw std::runtime_error(std::string(name) + " lossless decode failed at node " + std::to_string(id));
+            if ((id + 1) % 1000000 == 0)
+                std::cout << "LVC codec=" << name << " phase=verify_progress nodes=" << id + 1 << '\n';
         }
+        std::cout << "PASS codec=" << name << " bitwise_vectors=" << count << '/' << count << '\n';
     } else {
         std::filesystem::copy_file(source, prefix, std::filesystem::copy_options::overwrite_existing);
         diskann::lvc::write_record_file(prefix + ".data", count, dim, mode, store);
@@ -72,25 +78,32 @@ void convert_codec(const char *name, uint32_t mode, const std::string &source,
           << double(raw_bytes) / store.bytes.size() << ','
           << double(raw_index_bytes) / compressed_index_bytes << ','
           << (compression_only ? 0 : 1) << '\n';
+    stats.flush();
 }
 
 } // namespace
 
 int main(int argc, char **argv) {
+    // Preserve the last completed phase even when a server process crashes.
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
     try {
         if (argc < 4) throw std::runtime_error(
-            "Usage: convert_lvc_vamana GRAPH_PREFIX VECTORS.fbin OUTPUT_PREFIX [--chain_max 2|4|8|-1] [--compression_only]");
+            "Usage: convert_lvc_vamana GRAPH_PREFIX VECTORS.fbin OUTPUT_PREFIX [--chain_max 2|4|8|-1] [--compression_only] [--threads N]");
         const std::string source = argv[1];
         const std::string input = argv[2];
         const std::string output = argv[3];
         int chain_max = 2;
+        int threads = 1;
         bool compression_only = false;
         for (int i = 4; i < argc; ++i) {
             const std::string arg = argv[i];
             if (arg == "--chain_max" && i + 1 < argc) chain_max = std::stoi(argv[++i]);
+            else if (arg == "--threads" && i + 1 < argc) threads = std::stoi(argv[++i]);
             else if (arg == "--compression_only") compression_only = true;
             else throw std::runtime_error("Unknown conversion option: " + arg);
         }
+        diskann::lvc::validate_build_threads(threads);
         if (chain_max != 2 && !compression_only)
             throw std::runtime_error("Deep chains require --compression_only; searchable Vamana format is chain=2");
         std::ifstream fbin(input, std::ios::binary);
@@ -123,7 +136,9 @@ int main(int argc, char **argv) {
 
         const auto neighbors = [&](uint32_t id) -> const std::vector<uint32_t> & { return graph[id]; };
         const auto vector = [&](uint32_t id) { return vectors.data() + uint64_t(id) * dim; };
-        const auto forest = diskann::lvc::build_forest(count, dim, neighbors, vector, chain_max);
+        std::cout << "LVC phase=forest_begin nodes=" << count << " chain=" << chain_max << " threads=" << threads << '\n';
+        const auto forest = diskann::lvc::build_forest(count, dim, neighbors, vector, chain_max, nullptr, threads);
+        std::cout << "LVC phase=forest_done\n";
         uint32_t max_depth = 0;
         uint64_t depth_sum = 0;
         double distance_sum = 0;
@@ -171,9 +186,9 @@ int main(int argc, char **argv) {
             std::cout << "raw graph_bytes=" << std::filesystem::file_size(raw_prefix)
                       << " data_bytes=" << std::filesystem::file_size(raw_prefix + ".data") << '\n';
         }
-        convert_codec<hnswlib::codecs::DeXORCodecPolicy>("dexor", 2, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
-        convert_codec<hnswlib::codecs::GorillaCodecPolicy>("gorilla", 3, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
-        convert_codec<hnswlib::codecs::ElfCodecPolicy>("elf", 4, source, output, forest, vectors, count, dim, compression_only, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
+        convert_codec<hnswlib::codecs::DeXORCodecPolicy>("dexor", 2, source, output, forest, vectors, count, dim, compression_only, threads, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
+        convert_codec<hnswlib::codecs::GorillaCodecPolicy>("gorilla", 3, source, output, forest, vectors, count, dim, compression_only, threads, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
+        convert_codec<hnswlib::codecs::ElfCodecPolicy>("elf", 4, source, output, forest, vectors, count, dim, compression_only, threads, stats, mean_reference_l2, p50_reference_l2, p95_reference_l2, average_depth, average_nonroot_depth, max_depth);
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "D2 conversion failed: " << error.what() << '\n';
