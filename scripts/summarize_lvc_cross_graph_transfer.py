@@ -8,6 +8,7 @@ from pathlib import Path
 
 CHAINS = ((2, ""), (4, "_ch4"), (8, "_ch8"), (-1, "_ch-1"))
 CODECS = ("dexor", "gorilla", "elf")
+DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "lvc_cross_graph_transfer_results"
 DATASET_ORDER = (
     "sift-128-euclidean", "mnist-784-euclidean",
     "fashion-mnist-784-euclidean", "gist-960-euclidean",
@@ -129,7 +130,10 @@ def align_latency(retrieval, datasets):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path,
-                        default=Path(__file__).resolve().parents[1] / "build/data/cross_graph_transfer")
+                        default=Path(__file__).resolve().parents[1] / "build/data/cross_graph_transfer",
+                        help="Root containing the per-dataset experiment directories")
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR,
+                        help="Publish summary CSVs here as well as under --root (default: %(default)s)")
     args = parser.parse_args()
     root = args.root.resolve()
     if not root.is_dir():
@@ -157,12 +161,17 @@ def main():
     if not completed:
         parser.error("no complete cross-graph datasets found")
 
-    write_csv(root / "compression_summary.csv", compression)
-    write_csv(root / "retrieval_summary.csv", retrieval)
     alpha_rows = [row for row in retrieval
                   if row["tls"] == "1" and abs(float(row["alpha"]) - 0.2) < 1e-6]
-    write_csv(root / "retrieval_alpha_0p2.csv", alpha_rows, list(retrieval[0]))
-    write_csv(root / "recall_aligned_latency.csv", align_latency(retrieval, completed))
+    aligned = align_latency(retrieval, completed)
+    # Keep the historical build/data outputs and publish the same data to the
+    # versioned results directory used by plotting and paper analysis.
+    for destination in dict.fromkeys((root, args.output_dir.resolve())):
+        destination.mkdir(parents=True, exist_ok=True)
+        write_csv(destination / "compression_summary.csv", compression)
+        write_csv(destination / "retrieval_summary.csv", retrieval)
+        write_csv(destination / "retrieval_alpha_0p2.csv", alpha_rows, list(retrieval[0]))
+        write_csv(destination / "recall_aligned_latency.csv", aligned)
     print("Complete datasets:", ", ".join(completed))
 
 

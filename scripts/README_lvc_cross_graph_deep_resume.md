@@ -83,9 +83,23 @@ BUILD_THREADS=16 HNSW_DIR="$HOME/HNSWCW/compressedhnsw" \
 - `decision.json`：只有全部完成且正确性通过才写 `status=complete`、`include_deep=true`。
 
 完整检索预期 **118 行**：HNSW 54 行 + Vamana 64 行。
-成功后调用现有汇总脚本，在上一级刷新 compression/retrieval/recall-aligned CSV；
+成功后调用现有汇总脚本，在上一级刷新 compression/retrieval/recall-aligned CSV，
+并将相同的四份汇总 CSV 同步到 `scripts/lvc_cross_graph_transfer_results/`；
 五个数据集均完整时 compression summary 为 **120 行**，retrieval summary 为 **590 行**。
 根目录已有的其他四个数据集文件不会重跑或覆盖。
+
+如果实验已经通过，只需要更新汇总目录，执行以下命令即可，无需重新运行补齐脚本、
+编译或执行检索：
+
+```bash
+python3 scripts/summarize_lvc_cross_graph_transfer.py \
+  --root build/data/cross_graph_transfer \
+  --output-dir scripts/lvc_cross_graph_transfer_results
+```
+
+`--root` 是原始实验结果的输入根目录；`--output-dir` 是汇总 CSV 的发布目录，
+默认值为上述 `scripts/lvc_cross_graph_transfer_results/`。为兼容旧流程，
+四份汇总 CSV 也会保留在 `--root` 中。
 
 ## 本次定位与修复的边界
 

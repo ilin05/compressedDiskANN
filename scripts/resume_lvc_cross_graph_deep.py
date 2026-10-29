@@ -14,7 +14,7 @@ import struct
 import subprocess
 import time
 
-from summarize_lvc_cross_graph_transfer import CODECS, CHAINS, read_csv, write_csv
+from summarize_lvc_cross_graph_transfer import CODECS, CHAINS, DEFAULT_OUTPUT_DIR, read_csv, write_csv
 
 DATASET = "deep-image-96-angular"
 HNSW_EFS = [10, 20, 30, 40, 60, 80, 100, 150, 200]
@@ -400,8 +400,9 @@ def main():
         failures=runner.failures), indent=2))
     if complete:
         subprocess.run(["python3", str(Path(__file__).with_name("summarize_lvc_cross_graph_transfer.py")),
-                        "--root", str(out.parent)], check=True)
+                        "--root", str(out.parent), "--output-dir", str(DEFAULT_OUTPUT_DIR)], check=True)
         print("PASS DEEP complete; full matrix and recall-aligned summaries refreshed:", out.parent)
+        print("Published summary CSVs:", DEFAULT_OUTPUT_DIR)
     else:
         print("INCOMPLETE: inspect", state / "decision.json", "and", state / "status.csv")
     return 0 if complete else 1
