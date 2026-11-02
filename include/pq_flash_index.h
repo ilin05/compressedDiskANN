@@ -69,6 +69,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     DISKANN_DLLEXPORT void set_lvc_chain_max(int chain_max);
     DISKANN_DLLEXPORT void set_lvc_build_threads(int threads);
     DISKANN_DLLEXPORT void set_alp_encode_threads(int threads);
+    DISKANN_DLLEXPORT void set_cache_load_threads(int threads);
     DISKANN_DLLEXPORT void set_lvc_fallback_root_candidates(int count);
     DISKANN_DLLEXPORT void sample_cache_budget(const std::vector<uint32_t> &nodes, const std::string &csv_path);
 
@@ -116,6 +117,9 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
                                             QueryStats *stats = nullptr);
 
     DISKANN_DLLEXPORT uint64_t get_data_dim();
+    DISKANN_DLLEXPORT uint64_t get_pq_code_bytes() const;
+    DISKANN_DLLEXPORT uint64_t get_pq_table_bytes() const;
+    DISKANN_DLLEXPORT uint64_t get_entrypoint_bytes() const;
 
     std::shared_ptr<AlignedFileReader> &reader;
 
@@ -245,6 +249,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     int _lvc_chain_max = 2;
     int _lvc_build_threads = 1;
     int _alp_encode_threads = 1;
+    int _cache_load_threads = 1;
     int _lvc_fallback_root_candidates = 1;
     double _cache_forest_build_seconds = 0;
     std::unique_ptr<lvc::RecordStore<hnswlib::codecs::DeXORCodecPolicy>> _dexor_cache;

@@ -551,6 +551,29 @@ void PQFlashIndex<T, LabelT>::set_alp_encode_threads(int threads)
 }
 
 template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_cache_load_threads(int threads)
+{
+    lvc::validate_build_threads(threads);
+    _cache_load_threads = threads;
+}
+
+template <typename T, typename LabelT>
+uint64_t PQFlashIndex<T, LabelT>::get_pq_code_bytes() const {
+    return data ? _num_points * _n_chunks : 0;
+}
+
+template <typename T, typename LabelT>
+uint64_t PQFlashIndex<T, LabelT>::get_pq_table_bytes() const {
+    return _pq_table.accounted_memory_bytes() + _disk_pq_table.accounted_memory_bytes();
+}
+
+template <typename T, typename LabelT>
+uint64_t PQFlashIndex<T, LabelT>::get_entrypoint_bytes() const {
+    return (_medoids ? _num_medoids * sizeof(uint32_t) : 0) +
+           (_centroid_data ? _num_medoids * _aligned_dim * sizeof(float) : 0);
+}
+
+template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::set_lvc_fallback_root_candidates(int count)
 {
     if (count != 0 && count != 1) throw std::invalid_argument("LVC fallback root candidates must be 0 or 1");
@@ -626,7 +649,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     // Allocate space for coordinate cache
     // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时�?    size_t CHUNK_BLOCK_SIZE = 8;
     // Allocate temporary space for coordinate cache reading
-    size_t CHUNK_BLOCK_SIZE = (_cache_payload_mode == 0 && !_use_disk_index_pq && _alp_encode_threads > 1) ? 128 : 8;
+    size_t CHUNK_BLOCK_SIZE = _cache_load_threads > 1 ? 1024 :
+        ((_cache_payload_mode == 0 && !_use_disk_index_pq && _alp_encode_threads > 1) ? 128 : 8);
     T* temp_coord_cache_buf;
     size_t bytes_per_node = std::max((size_t)(_aligned_dim * sizeof(T)), (size_t)_disk_bytes_per_point);
     size_t temp_coord_cache_buf_len = CHUNK_BLOCK_SIZE * (bytes_per_node / sizeof(T) + 1);
@@ -663,7 +687,30 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
 
         // issue the reads
         Timer batch_timer;
-        auto read_status = read_nodes(nodes_to_read, coord_buffers, nbr_buffers);
+        std::vector<bool> read_status;
+        if (_cache_load_threads == 1) {
+            read_status = read_nodes(nodes_to_read, coord_buffers, nbr_buffers);
+        } else {
+            // Each worker borrows a distinct preallocated I/O context; shared
+            // cache maps and record buffers are updated only after the join.
+            const size_t count = nodes_to_read.size();
+            const size_t parts = std::min(count, static_cast<size_t>(_cache_load_threads));
+            std::vector<uint8_t> success(count, 0);
+#pragma omp parallel for schedule(static) num_threads(_cache_load_threads)
+            for (int64_t part = 0; part < static_cast<int64_t>(parts); ++part) {
+                const size_t begin = count * static_cast<size_t>(part) / parts;
+                const size_t end = count * (static_cast<size_t>(part) + 1) / parts;
+                std::vector<uint32_t> ids(nodes_to_read.begin() + begin, nodes_to_read.begin() + end);
+                std::vector<T *> coords(coord_buffers.begin() + begin, coord_buffers.begin() + end);
+                std::vector<std::pair<uint32_t, uint32_t *>> nhoods(nbr_buffers.begin() + begin, nbr_buffers.begin() + end);
+                const auto status = read_nodes(ids, coords, nhoods);
+                for (size_t j = begin; j < end; ++j) {
+                    success[j] = status[j - begin];
+                    nbr_buffers[j] = nhoods[j - begin];
+                }
+            }
+            read_status.assign(success.begin(), success.end());
+        }
         if (alp_cache) alp_read_seconds += batch_timer.elapsed() * 1e-6;
         std::vector<std::vector<uint8_t>> alp_records;
         if (alp_cache) {
@@ -742,6 +789,8 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     }
     diskann::aligned_free(temp_coord_cache_buf);
     _compressed_coord_cache.shrink_to_fit();
+    diskann::cout << "CACHE_READ_CONFIG threads=" << _cache_load_threads
+                  << " batch=" << CHUNK_BLOCK_SIZE << std::endl;
     if (alp_cache) {
         diskann::cout << "ALP_CACHE_TIMING threads=" << _alp_encode_threads << " batch=" << CHUNK_BLOCK_SIZE
                       << " read_seconds=" << alp_read_seconds << " encode_seconds=" << alp_encode_seconds

@@ -89,7 +89,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const std::string &cache_budget_sample_csv = "",
                       const std::string &cache_node_ids_file = "", const int lvc_build_threads = 32,
                       const int lvc_fallback_root_candidates = 1,
-                      const std::string &per_round_csv = "", const int alp_encode_threads = 1)
+                      const std::string &per_round_csv = "", const int alp_encode_threads = 1,
+                      const int cache_load_threads = 1)
 {
     struct SearchCsvRow
     {
@@ -181,7 +182,9 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         new diskann::PQFlashIndex<T, LabelT>(reader, metric));
 
     const auto index_load_start = std::chrono::steady_clock::now();
-    int res = _pFlashIndex->load(num_threads, index_path_prefix.c_str());
+    if (cache_load_threads < 1) throw std::invalid_argument("cache_load_threads must be positive");
+    if (cache_load_threads > 1) omp_set_dynamic(0);
+    int res = _pFlashIndex->load(std::max(num_threads, static_cast<uint32_t>(cache_load_threads)), index_path_prefix.c_str());
     const double index_load_seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - index_load_start).count();
 
@@ -194,6 +197,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     _pFlashIndex->set_lvc_chain_max(lvc_chain_max);
     _pFlashIndex->set_lvc_build_threads(lvc_build_threads);
     _pFlashIndex->set_alp_encode_threads(alp_encode_threads);
+    _pFlashIndex->set_cache_load_threads(cache_load_threads);
     _pFlashIndex->set_lvc_fallback_root_candidates(lvc_fallback_root_candidates);
     const auto cache_start = std::chrono::steady_clock::now();
 
@@ -249,6 +253,14 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                   << " includes_state=" << cache_budget_include_state
                   << " nhood_buckets=" << cache_stats.nhood_buckets
                   << " coord_buckets=" << cache_stats.coord_buckets << std::endl;
+    const uint64_t pq_code_bytes = _pFlashIndex->get_pq_code_bytes();
+    const uint64_t pq_table_bytes = _pFlashIndex->get_pq_table_bytes();
+    const uint64_t entrypoint_bytes = _pFlashIndex->get_entrypoint_bytes();
+    diskann::cout << "INDEX_MEMORY pq_code_bytes=" << pq_code_bytes << " pq_table_bytes=" << pq_table_bytes
+                  << " entrypoint_bytes=" << entrypoint_bytes
+                  << " cache_bytes=" << cache_stats.total_bytes(true)
+                  << " accounted_index_bytes=" << pq_code_bytes + pq_table_bytes + entrypoint_bytes + cache_stats.total_bytes(true)
+                  << std::endl;
     if (cache_budget_probe_only) return 0;
     if (cache_budget_bytes && cache_stats.total_bytes(cache_budget_include_state) > cache_budget_bytes)
         throw std::runtime_error("Cache graph plus vector/state budget exceeded");
@@ -611,6 +623,7 @@ int main(int argc, char **argv)
     int lvc_chain_max = 2;
     int lvc_build_threads = 32;
     int alp_encode_threads = 1;
+    int cache_load_threads = 1;
     int lvc_fallback_root_candidates = 1;
     std::string cache_budget_sample_csv;
     std::string cache_node_ids_file;
@@ -662,6 +675,8 @@ int main(int argc, char **argv)
                                        "Maximum forest fallback/record encoding threads, independent of query -T");
         optional_configs.add_options()("alp_encode_threads", po::value<int>(&alp_encode_threads)->default_value(1),
                                        "ALP cache encoding threads, independent of query -T (positive integer)");
+        optional_configs.add_options()("cache_load_threads", po::value<int>(&cache_load_threads)->default_value(1),
+                                       "Parallel cache node reading threads, independent of query -T");
         optional_configs.add_options()("lvc_fallback_root_candidates", po::value<int>(&lvc_fallback_root_candidates)->default_value(1),
                                        "Unbounded fallback: 1=nearest root tree, 0=legacy global candidates");
         optional_configs.add_options()("cache_budget_include_state", po::bool_switch(&cache_budget_include_state),
@@ -792,15 +807,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -812,15 +827,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv, alp_encode_threads, cache_load_threads);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;

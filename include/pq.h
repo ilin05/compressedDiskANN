@@ -32,6 +32,15 @@ class FixedChunkPQTable
 
     uint32_t get_num_chunks();
 
+    // Allocated PQ arrays only; allocator metadata and object overhead excluded.
+    uint64_t accounted_memory_bytes() const {
+        return (tables ? 256 * ndims * sizeof(float) : 0) +
+               (tables_tr ? 256 * ndims * sizeof(float) : 0) +
+               (centroid ? ndims * sizeof(float) : 0) +
+               (chunk_offsets ? (n_chunks + 1) * sizeof(uint32_t) : 0) +
+               (rotmat_tr ? ndims * ndims * sizeof(float) : 0);
+    }
+
     void preprocess_query(float *query_vec);
 
     // assumes pre-processed query
