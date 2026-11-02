@@ -8,7 +8,14 @@ data=${DATA_DIR:-"$build/data/bigann"}
 index=${INDEX_PREFIX:-"$data/disk_index_bigann_1B_R32_L50_A1.2"}
 query=${QUERY_FILE:-"$data/bigann_query.fbin"}
 gt=${GT_FILE:-"$data/bigann_1B_gt.bin"}
-out=${OUTPUT_DIR:-"$repo/scripts/lvc_disk_cache_sensitivity_recheck_results/bigann_1B_dexor_C100M_$(date -u +%Y%m%dT%H%M%SZ)"}
+cache_nodes=${CACHE_NODES:-100000000}
+case "$cache_nodes" in
+    10000000) cache_label=10M ;;
+    25000000) cache_label=25M ;;
+    100000000) cache_label=100M ;;
+    *) echo "CACHE_NODES must be 10000000, 25000000 or 100000000." >&2; exit 1 ;;
+esac
+out=${OUTPUT_DIR:-"$repo/scripts/lvc_disk_cache_sensitivity_recheck_results/bigann_1B_dexor_C${cache_label}_$(date -u +%Y%m%dT%H%M%SZ)"}
 load_threads=${LVC_BUILD_THREADS:-32}
 interval=${MONITOR_INTERVAL:-5}
 mkdir -p "$out"
@@ -26,11 +33,11 @@ export OMP_NUM_THREADS="$load_threads" OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 command=("$build/apps/search_disk_index"
     --data_type float --dist_fn l2 --index_path_prefix "$index"
     --query_file "$query" --gt_file "$gt" --cache_codec dexor
-    --num_nodes_to_cache 100000000 --lvc_chain_max 2
+    --num_nodes_to_cache "$cache_nodes" --lvc_chain_max 2
     --lvc_build_threads "$load_threads" --lvc_fallback_root_candidates 1
     --lvc_state_cache_ratio 0.01 --cache_budget_include_state
     -K 1 -L 1 2 3 4 5 6 8 10 -T 1 -W 2 -R 10
-    --result_path "$out/dexor_ch2_C100M" --per_round_csv "$out/rounds.csv")
+    --result_path "$out/dexor_ch2_C${cache_label}" --per_round_csv "$out/rounds.csv")
 printf '#!/usr/bin/env bash\n' > "$out/command.sh"
 printf 'export OMP_NUM_THREADS=%q OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1\n' "$load_threads" >> "$out/command.sh"
 printf '%q ' "${command[@]}" >> "$out/command.sh"

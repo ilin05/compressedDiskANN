@@ -1,5 +1,38 @@
 # BIGANN-1B DeXOR 100M cache recheck
 
+## Matched 10M / 25M rechecks
+
+The 10M and 25M launchers reuse the 100M implementation. Only the BFS cache
+node count and output names change; index, queries, query order, L order, ten
+rounds per L, decoding settings and monitoring are identical.
+
+Run both serially (recommended):
+
+```bash
+nohup bash scripts/test_lvc_disk_dexor_10M_25M_recheck_bigann_1B.sh \
+  > test_lvc_disk_dexor_10M_25M_recheck.log 2>&1 &
+```
+
+The combined run stores two independent result directories under
+`scripts/lvc_disk_cache_sensitivity_recheck_results/bigann_1B_dexor_C10M_25M_<UTC timestamp>/`.
+An `OUTPUT_DIR` override specifies this parent directory for the combined run.
+Each child retains 80 round rows, per-round IDs/distances, summary, flagged
+rounds, RSS/fault counters and logs, just as the 100M run does. All ten rounds
+remain available; the first round is not deleted from the raw observations.
+
+To run one case separately, use either launcher (with its own `OUTPUT_DIR`):
+
+```bash
+bash scripts/test_lvc_disk_dexor_10M_recheck_bigann_1B.sh
+bash scripts/test_lvc_disk_dexor_25M_recheck_bigann_1B.sh
+```
+
+Do not run the two benchmarks concurrently when comparing them. The original
+100M script still defaults to 100M; internally it also accepts
+`CACHE_NODES=10000000` or `25000000` for the new launchers.
+
+## Original 100M recheck
+
 Run from the DiskANN repository after updating `apps/search_disk_index.cpp`:
 
 ```bash
