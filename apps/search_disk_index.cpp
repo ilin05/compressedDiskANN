@@ -88,7 +88,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                       const int lvc_chain_max = 2, const bool cache_budget_include_state = false,
                       const std::string &cache_budget_sample_csv = "",
                       const std::string &cache_node_ids_file = "", const int lvc_build_threads = 32,
-                      const int lvc_fallback_root_candidates = 1)
+                      const int lvc_fallback_root_candidates = 1,
+                      const std::string &per_round_csv = "")
 {
     struct SearchCsvRow
     {
@@ -107,6 +108,20 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         size_t current_rss_after_search_kb;
         bool has_recall;
     };
+
+    // Flush every round so diagnostics survive an interrupted long-running search.
+    std::ofstream round_csv;
+    if (!per_round_csv.empty())
+    {
+        round_csv.exceptions(std::ios::failbit | std::ios::badbit);
+        round_csv.open(per_round_csv);
+        round_csv << "L,round,K,queries,threads,beamwidth,wall_seconds,qps,recall_percent,"
+                     "mean_us,p999_us,mean_ios,mean_io_us,mean_cpu_us,decode_calls,"
+                     "state_hits,replay_records,decode_bytes,decode_us,current_rss_kib,peak_rss_kib,"
+                     "minor_faults,major_faults,user_cpu_seconds,system_cpu_seconds,start_unix_ms\n";
+        round_csv << std::setprecision(17);
+        round_csv.flush();
+    }
 
     diskann::cout << "Search parameters: #threads: " << num_threads << ", ";
     if (beamwidth <= 0)
@@ -353,7 +368,14 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
             auto stats = new diskann::QueryStats[query_num];
             std::vector<uint64_t> query_result_ids_64(recall_at * query_num);
 
-            auto s = std::chrono::high_resolution_clock::now();
+            const auto start_unix_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+#ifndef _WINDOWS
+            struct rusage usage_before = {}, usage_after = {};
+            if (round_csv.is_open() && getrusage(RUSAGE_SELF, &usage_before) != 0)
+                throw std::runtime_error("Cannot read process resource counters before search round");
+#endif
+            auto s = std::chrono::steady_clock::now();
 
 #pragma omp parallel for schedule(dynamic, 1)
             for (int64_t i = 0; i < (int64_t)query_num; i++)
@@ -383,7 +405,11 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                 }
             }
 
-            auto e = std::chrono::high_resolution_clock::now();
+            auto e = std::chrono::steady_clock::now();
+#ifndef _WINDOWS
+            if (round_csv.is_open() && getrusage(RUSAGE_SELF, &usage_after) != 0)
+                throw std::runtime_error("Cannot read process resource counters after search round");
+#endif
             std::chrono::duration<double> diff = e - s;
             double qps = (1.0 * query_num) / (1.0 * diff.count());
             accumulated_qps.push_back(qps);
@@ -415,16 +441,25 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                                                              [](const diskann::QueryStats &stats) { return stats.cpu_us; });
             accumulated_mean_cpuus.push_back(mean_cpuus);
 
+            double round_recall = 0;
+            std::vector<uint32_t> round_ids;
+            if (calc_recall_flag || round_csv.is_open())
+            {
+                // Keep first-round result files, but calculate recall from this round's IDs.
+                round_ids.resize(recall_at * query_num);
+                diskann::convert_types<uint64_t, uint32_t>(query_result_ids_64.data(), round_ids.data(),
+                                                         query_num, recall_at);
+            }
             if (calc_recall_flag)
             {
-                double recall = diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
-                                                          query_result_ids[test_id].data(), recall_at, recall_at);
-                accumulated_recalls.push_back(recall);
+                round_recall = diskann::calculate_recall((uint32_t)query_num, gt_ids, gt_dists, (uint32_t)gt_dim,
+                                                       round_ids.data(), recall_at, recall_at);
+                accumulated_recalls.push_back(round_recall);
             }
 
+            uint64_t calls = 0, state_hits = 0, hops = 0, bytes = 0;
+            double decode_us = 0;
             if (cache_mode >= 2) {
-                uint64_t calls = 0, state_hits = 0, hops = 0, bytes = 0;
-                double decode_us = 0;
                 for (size_t i = 0; i < query_num; ++i) {
                     calls += stats[i].lvc_decode_calls;
                     state_hits += stats[i].lvc_state_cache_hits;
@@ -436,6 +471,36 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
                               << " calls=" << calls << " replay_records=" << hops
                               << " state_hits=" << state_hits
                               << " bytes=" << bytes << " total_us=" << decode_us << std::endl;
+            }
+
+            if (round_csv.is_open())
+            {
+                round_csv << L << ',' << round + 1 << ',' << recall_at << ',' << query_num << ','
+                          << num_threads << ',' << optimized_beamwidth << ',' << diff.count() << ',' << qps << ',';
+                if (calc_recall_flag) round_csv << round_recall;
+                round_csv << ',' << mean_latency << ',' << latency_999 << ',' << mean_ios << ',' << mean_io_us
+                          << ',' << mean_cpuus << ',' << calls << ',' << state_hits << ',' << hops << ','
+                          << bytes << ',' << decode_us << ',' << get_current_rss_kb() << ',' << get_peak_rss_kb();
+#ifndef _WINDOWS
+                const double user_seconds = (usage_after.ru_utime.tv_sec - usage_before.ru_utime.tv_sec) +
+                    (usage_after.ru_utime.tv_usec - usage_before.ru_utime.tv_usec) / 1e6;
+                const double system_seconds = (usage_after.ru_stime.tv_sec - usage_before.ru_stime.tv_sec) +
+                    (usage_after.ru_stime.tv_usec - usage_before.ru_stime.tv_usec) / 1e6;
+                round_csv << ',' << usage_after.ru_minflt - usage_before.ru_minflt
+                          << ',' << usage_after.ru_majflt - usage_before.ru_majflt
+                          << ',' << user_seconds << ',' << system_seconds;
+#else
+                round_csv << ",,,,";
+#endif
+                round_csv << ',' << start_unix_ms << '\n';
+                round_csv.flush();
+                const auto round_prefix = result_output_prefix + "_L" + std::to_string(L) +
+                                          "_R" + std::to_string(round + 1);
+                diskann::save_bin<uint32_t>(round_prefix + "_idx_uint32.bin", round_ids.data(), query_num, recall_at);
+                diskann::save_bin<float>(round_prefix + "_dists_float.bin", query_result_dists[test_id].data(),
+                                        query_num, recall_at);
+                diskann::cout << "Search round saved L=" << L << " round=" << round + 1
+                              << " qps=" << qps << " mean_us=" << mean_latency << std::endl;
             }
 
             delete[] stats;
@@ -547,6 +612,7 @@ int main(int argc, char **argv)
     int lvc_fallback_root_candidates = 1;
     std::string cache_budget_sample_csv;
     std::string cache_node_ids_file;
+    std::string per_round_csv;
     uint64_t cache_budget_bytes = 0;
     float lvc_state_cache_ratio = 0.01f;
     std::string cache_codec;
@@ -631,6 +697,8 @@ int main(int argc, char **argv)
         optional_configs.add_options()("num_rounds,R",
                                        po::value<uint32_t>(&num_rounds)->default_value(1),
                                        "Number of search rounds per L value. Results are averaged across rounds. Default: 1");
+        optional_configs.add_options()("per_round_csv", po::value<std::string>(&per_round_csv)->default_value(""),
+                                       "Optional per-round CSV (flushed each round) and per-round result ID/distance bins");
 
         // Merge required and optional parameters
         desc.add(required_configs).add(optional_configs);
@@ -720,15 +788,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path_prefix, query_file, gt_file, num_threads, K, W,
-                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                    num_nodes_to_cache, search_io_limit, Lvec, fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
@@ -740,15 +808,15 @@ int main(int argc, char **argv)
             if (data_type == std::string("float"))
                 return search_disk_index<float>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                 num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                                                fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else if (data_type == std::string("int8"))
                 return search_disk_index<int8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                  num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                                                 fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else if (data_type == std::string("uint8"))
                 return search_disk_index<uint8_t>(metric, index_path_prefix, result_path_prefix, query_file, gt_file,
                                                   num_threads, K, W, num_nodes_to_cache, search_io_limit, Lvec,
-                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates);
+                                                  fail_if_recall_below, query_filters, use_reorder_data, num_rounds, cache_mode, verify_cache, lvc_state_cache_ratio, cache_budget_bytes, cache_budget_probe_only, lvc_chain_max, cache_budget_include_state, cache_budget_sample_csv, cache_node_ids_file, lvc_build_threads, lvc_fallback_root_candidates, per_round_csv);
             else
             {
                 std::cerr << "Unsupported data type. Use float or int8 or uint8" << std::endl;
