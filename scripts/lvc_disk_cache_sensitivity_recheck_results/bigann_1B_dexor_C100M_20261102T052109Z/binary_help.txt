@@ -1,0 +1,108 @@
+
+Searches on-disk DiskANN indexes
+
+Usage: search_disk_index [OPTIONS]:
+  -h [ --help ]                         Print information on arguments
+
+Required:
+  --data_type arg                       data type, one of {int8, uint8, float} 
+                                        - float is single precision (32 bit)
+  --dist_fn arg                         distance function {l2, mips, fast_l2, 
+                                        cosine}.  'fast l2' and 'mips' only 
+                                        support data_type float
+  --index_path_prefix arg               Path prefix to the index, e.g. 
+                                        '/mnt/data/my_ann_index'
+  --result_path arg                     Path prefix for saving results of the 
+                                        queries, e.g. '/mnt/data/query_file_X.b
+                                        in'
+  --query_file arg                      Query file in binary format, e.g. 
+                                        '/mnt/data/query_file_X.bin'
+  -K [ --recall_at ] arg                Number of neighbors to be returned (K 
+                                        in the DiskANN white paper)
+  -L [ --search_list ] arg              Size of search list to use.  This value
+                                        is the number of neighbor/distance 
+                                        pairs to keep in memory at the same 
+                                        time while performing a query.  This 
+                                        can also be described as the size of 
+                                        the working set at query time.  This 
+                                        must be greater than or equal to the 
+                                        number of results/neighbors to return 
+                                        (K in the white paper).  Corresponds to
+                                        L in the DiskANN white paper.
+
+Optional:
+  --gt_file arg (=null)                 ground truth file for the queryset
+  -W [ --beamwidth ] arg (=2)           Beamwidth for search. Set 0 to optimize
+                                        internally.  Default value: 2
+  --num_nodes_to_cache arg (=0)         Number of BFS nodes around medoid(s) to
+                                        cache.  Default value: 0
+  --cache_codec arg (=alp)              RAM cache payload: alp, raw, dexor, 
+                                        gorilla, elf
+  --verify_cache                        Verify every differential cache vector 
+                                        bitwise after construction
+  --lvc_chain_max arg (=2)              Maximum record chain including root; -1
+                                        means unbounded
+  --lvc_build_threads arg (=32)         Maximum forest fallback/record encoding
+                                        threads, independent of query -T
+  --lvc_fallback_root_candidates arg (=1)
+                                        Unbounded fallback: 1=nearest root 
+                                        tree, 0=legacy global candidates
+  --cache_budget_include_state          Include decoding state and estimated 
+                                        state-map allocations in the cache cap
+  --cache_budget_sample_csv arg         Load sample nodes once, export all 
+                                        codec/chain byte statistics, then exit
+  --cache_node_ids_file arg             Use the first num_nodes_to_cache sorted
+                                        IDs from a lookup-probe bin file 
+                                        instead of BFS
+  --cache_budget_probe_only             Load the cache, report budget bytes, 
+                                        and exit before query search
+  --cache_budget_bytes arg (=0)         Maximum graph plus vector cache bytes, 
+                                        excluding PQ; state cache is optional
+  --lvc_state_cache_ratio arg (=0.00999999978)
+                                        Fraction of loaded cache nodes whose 
+                                        LVC root states are cached (0 to 0.01)
+  --search_io_limit arg (=4294967295)   Max #IOs for search.  Default value: 
+                                        uint32::max()
+  -T [ --num_threads ] arg (=56)        Number of threads used for building 
+                                        index.  Defaults to number of logical 
+                                        processor cores on your this machine 
+                                        returned by omp_get_num_procs()
+  --use_reorder_data                    Include full precision data in the 
+                                        index. Use only in conjuction with 
+                                        compressed data on SSD.  Default value:
+                                        false
+  --filter_label arg                    Filter to use when running a query.  
+                                        'filter_label' and 'query_filters_file'
+                                        are mutually exclusive.
+  --query_filters_file arg              Filter file for Queries for Filtered 
+                                        Search.  File format is text with one 
+                                        filter per line.  File must have 
+                                        exactly one filter OR the same number 
+                                        of filters as there are queries in the 
+                                        'query_file'.
+  --label_type arg (=uint)              Storage type of Labels {uint/uint32, 
+                                        ushort/uint16}, default value is uint 
+                                        which will consume memory 4 bytes per 
+                                        filter.  'uint' is an alias for 
+                                        'uint32' and 'ushort' is an alias for 
+                                        'uint16'.
+  --fail_if_recall_below arg (=0)       Value between 0 (inclusive) and 100 
+                                        (exclusive) indicating the recall 
+                                        tolerance percentage threshold before 
+                                        program fails with a non-zero exit 
+                                        code.  The default value of 0 means 
+                                        that the program will complete 
+                                        successfully with any recall value.  A 
+                                        non-zero value indicates the floor for 
+                                        acceptable recall values.  If the 
+                                        calculated recall value is below this 
+                                        threshold then the program will write 
+                                        out the results but return a non-zero 
+                                        exit code as a signal that the recall 
+                                        was not acceptable.
+  -R [ --num_rounds ] arg (=1)          Number of search rounds per L value. 
+                                        Results are averaged across rounds. 
+                                        Default: 1
+  --per_round_csv arg                   Optional per-round CSV (flushed each 
+                                        round) and per-round result ID/distance
+                                        bins
