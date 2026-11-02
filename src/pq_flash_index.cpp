@@ -10,6 +10,7 @@
 #include "cosine_similarity.h"
 #include <fstream>
 #include <iomanip>
+#include <limits>
 
 #ifdef _WINDOWS
 #include "windows_aligned_file_reader.h"
@@ -543,6 +544,13 @@ void PQFlashIndex<T, LabelT>::set_lvc_build_threads(int threads)
 }
 
 template <typename T, typename LabelT>
+void PQFlashIndex<T, LabelT>::set_alp_encode_threads(int threads)
+{
+    lvc::validate_build_threads(threads);
+    _alp_encode_threads = threads;
+}
+
+template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::set_lvc_fallback_root_candidates(int count)
 {
     if (count != 0 && count != 1) throw std::invalid_argument("LVC fallback root candidates must be 0 or 1");
@@ -618,7 +626,7 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     // Allocate space for coordinate cache
     // coordinate cache 的大小取决于要缓存的节点数和每个节点的维度（即特征数量）。对于每个要缓存的节点，我们需要为其坐标分配空间，坐标的长度由 _aligned_dim 决定。这里使用了对齐分配（alloc_aligned）来确保内存访问效率，特别是在处理大规模数据时�?    size_t CHUNK_BLOCK_SIZE = 8;
     // Allocate temporary space for coordinate cache reading
-    size_t CHUNK_BLOCK_SIZE = 8;
+    size_t CHUNK_BLOCK_SIZE = (_cache_payload_mode == 0 && !_use_disk_index_pq && _alp_encode_threads > 1) ? 128 : 8;
     T* temp_coord_cache_buf;
     size_t bytes_per_node = std::max((size_t)(_aligned_dim * sizeof(T)), (size_t)_disk_bytes_per_point);
     size_t temp_coord_cache_buf_len = CHUNK_BLOCK_SIZE * (bytes_per_node / sizeof(T) + 1);
@@ -629,6 +637,11 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
     if (_cache_payload_mode == 1)
         _compressed_coord_cache.reserve(num_cached_nodes * _data_dim * sizeof(T));
 
+    const bool alp_cache = _cache_payload_mode == 0 && !_use_disk_index_pq;
+    double alp_read_seconds = 0, alp_encode_seconds = 0, alp_merge_seconds = 0;
+    uint64_t alp_verified_vectors = 0, alp_exact_coordinates = 0;
+    double alp_max_abs_error = 0;
+    uint64_t alp_hash = 1469598103934665603ULL;
     // calculate blocks
     size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, CHUNK_BLOCK_SIZE);
     for (size_t block = 0; block < num_blocks; block++)
@@ -649,7 +662,20 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
         }
 
         // issue the reads
+        Timer batch_timer;
         auto read_status = read_nodes(nodes_to_read, coord_buffers, nbr_buffers);
+        if (alp_cache) alp_read_seconds += batch_timer.elapsed() * 1e-6;
+        std::vector<std::vector<uint8_t>> alp_records;
+        if (alp_cache) {
+            alp_records.resize(read_status.size());
+            batch_timer.reset();
+#pragma omp parallel for schedule(static) num_threads(_alp_encode_threads) if(_alp_encode_threads > 1)
+            for (int64_t i = 0; i < static_cast<int64_t>(read_status.size()); ++i) {
+                if (read_status[i]) flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, alp_records[i]);
+            }
+            alp_encode_seconds += batch_timer.elapsed() * 1e-6;
+            batch_timer.reset();
+        }
 
         // check for success and insert into the cache.
         for (size_t i = 0; i < read_status.size(); i++)
@@ -674,7 +700,27 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                         std::memcpy(compressed_data.data(), coord_buffers[i], raw_bytes);
                     }
                 } else if (!_use_disk_index_pq) {
-                    flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, compressed_data);
+                    compressed_data = std::move(alp_records[i]);
+                    if (_verify_cache_payload) {
+                        std::vector<uint8_t> serial;
+                        flash_encode_and_store<T>(coord_buffers[i], this->_data_dim, serial);
+                        if (serial != compressed_data)
+                            throw std::runtime_error("ALP parallel/serial encoded bytes differ");
+                        std::vector<T> decoded(_aligned_dim);
+                        flash_decode_vector<T>(compressed_data.data(), _data_dim, _aligned_dim, decoded.data());
+                        for (size_t d = 0; d < _data_dim; ++d) {
+                            const double error = std::abs(double(decoded[d]) - double(coord_buffers[i][d]));
+                            alp_max_abs_error = std::max(alp_max_abs_error, error);
+                            const double rounding_slack = std::is_same_v<T, float>
+                                ? std::numeric_limits<float>::epsilon() * std::max(std::abs(double(coord_buffers[i][d])), 1.0)
+                                : 0.0;
+                            if (!std::isfinite(error) || error > (std::is_same_v<T, float> ? 1e-4 + rounding_slack : 0.0))
+                                throw std::runtime_error("ALP decoded coordinate exceeds tolerance");
+                            if (std::memcmp(&decoded[d], &coord_buffers[i][d], sizeof(T)) == 0) ++alp_exact_coordinates;
+                        }
+                        for (uint8_t byte : compressed_data) { alp_hash ^= byte; alp_hash *= 1099511628211ULL; }
+                        ++alp_verified_vectors;
+                    }
                 } else {
                     // if already using PQ, coord_buffers[i] holds _disk_bytes_per_point of uint8_t data.
                     // we'll just copy it directly.
@@ -692,9 +738,20 @@ template <typename T, typename LabelT> void PQFlashIndex<T, LabelT>::load_cache_
                 _nhood_cache.insert(std::make_pair(nodes_to_read[i], nbr_buffers[i]));
             }
         }
+        if (alp_cache) alp_merge_seconds += batch_timer.elapsed() * 1e-6;
     }
     diskann::aligned_free(temp_coord_cache_buf);
     _compressed_coord_cache.shrink_to_fit();
+    if (alp_cache) {
+        diskann::cout << "ALP_CACHE_TIMING threads=" << _alp_encode_threads << " batch=" << CHUNK_BLOCK_SIZE
+                      << " read_seconds=" << alp_read_seconds << " encode_seconds=" << alp_encode_seconds
+                      << " merge_seconds=" << alp_merge_seconds << std::endl;
+        if (_verify_cache_payload)
+            diskann::cout << "ALP_CACHE_VERIFY vectors=" << alp_verified_vectors
+                          << " coordinates=" << alp_verified_vectors * _data_dim
+                          << " exact_coordinates=" << alp_exact_coordinates << " max_abs_error=" << alp_max_abs_error
+                          << " encoded_hash=" << alp_hash << std::endl;
+    }
     cache_read_seconds = cache_load_timer.elapsed() * 1e-6;
     if (_cache_payload_mode >= 2) {
         Timer build_timer;
