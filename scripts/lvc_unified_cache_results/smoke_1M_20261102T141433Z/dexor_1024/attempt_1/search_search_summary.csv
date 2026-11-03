@@ -1,0 +1,2 @@
+L,Beamwidth,Num_Nodes_To_Cache,RSS_After_Cache_Load(KB),RSS_After_Search(KB),Current_RSS_After_Cache_Load(KB),Current_RSS_After_Search(KB),QPS,Mean Latency (mus),99.9 Latency,Mean IOs,Mean IO (us),CPU (s),Recall@1,ActualCachedNodes,CacheBytes,StateCacheBytes,ChainMax,CacheLoadSeconds,IndexLoadSeconds,TotalLoadSeconds,CacheSelectionSeconds,CacheDataLoadSeconds,ForestBuildSeconds
+10,1,1024,180992,181888,188960,189644,627.398124,1554.733400,3687.000000,14.296800,1423.537700,69.775950,100.000000,1024,536363,67368,2,0.055217,0.019537,0.074756,0.010961,0.044257,0.004838
