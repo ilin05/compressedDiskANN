@@ -26,6 +26,15 @@ FIELDS = ("case", "codec", "nodes", "status", "error", "attempt", "exit_code", "
           "cache_data_load_seconds", "total_load_seconds", "forest_seconds", "alp_read_seconds",
           "alp_encode_seconds", "alp_merge_seconds", "lvc_encode_seconds", "propagation_seconds", "fallback_seconds", "process_wall_seconds", "cache_load_threads",
           "alp_encode_threads", "lvc_build_threads", "query_threads", "beamwidth", "source_dir")
+FIELDS += ("actual_cached_nodes", "footprint_status", "cached_data_bytes", "cached_data_gib",
+           "vector_record_bytes", "nhood_buckets", "coord_buckets")
+FOOTPRINT_FIELDS = ("case", "codec", "nodes", "actual_cached_nodes", "status", "footprint_status", "error",
+                    "adjacency_bytes", "payload_bytes", "record_metadata_bytes", "state_cache_bytes",
+                    "vector_record_bytes", "cached_data_bytes", "cached_data_gib", "lookup_bytes",
+                    "cache_bytes", "pq_code_bytes", "pq_table_bytes", "entrypoint_bytes",
+                    "accounted_index_bytes", "nhood_buckets", "coord_buckets", "payload_ratio_f32",
+                    "index_load_seconds", "cache_selection_seconds", "cache_data_load_seconds",
+                    "total_load_seconds", "process_wall_seconds", "source_dir")
 
 
 def write_json(path, value):
@@ -34,12 +43,20 @@ def write_json(path, value):
     os.replace(str(tmp), str(path))
 
 
-def write_summary(path, rows):
+def write_summary(path, rows, fields=FIELDS):
     tmp = path.with_suffix(".tmp")
     with tmp.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         writer.writeheader(); writer.writerows(rows)
     os.replace(str(tmp), str(path))
+
+
+def write_footprint(path, rows):
+    # One row per case, rather than one identical footprint for each query L.
+    cases = {}
+    for row in rows:
+        cases.setdefault(row["case"], row)
+    write_summary(path, cases.values(), FOOTPRINT_FIELDS)
 
 
 def fields_from_line(text, marker):
@@ -60,6 +77,48 @@ def read_bin_header(path):
     if len(data) != 8:
         raise ValueError("Invalid bin header: " + str(path))
     return struct.unpack("<II", data)
+
+
+def footprint_from_log(path, dimension):
+    """Use post-load native counters, even if a later query exits unsuccessfully."""
+    cache = budget_from_log(path)
+    if not cache or cache.get("includes_state") != 1:
+        raise ValueError("Missing cache accounting including decoding state")
+    memory = fields_from_line(path.read_text(errors="replace"), "INDEX_MEMORY")
+    adjacency = cache["graph_bytes"] - cache["graph_lookup_bytes"]
+    payload = cache["vector_payload_bytes"]
+    metadata = cache["vector_metadata_bytes"]
+    state = cache["state_cache_bytes"]
+    cached_data = adjacency + payload + metadata + state
+    if min(adjacency, payload, metadata, state) < 0 or payload == 0:
+        raise ValueError("Invalid cache component sizes")
+    if cached_data + cache["graph_lookup_bytes"] != cache["total_bytes"]:
+        raise ValueError("Cache footprint components do not sum")
+    if int(memory["cache_bytes"]) != cache["total_bytes"]:
+        raise ValueError("Cache/index memory counters disagree")
+    if int(memory["accounted_index_bytes"]) != sum(int(memory[k]) for k in
+            ("pq_code_bytes", "pq_table_bytes", "entrypoint_bytes", "cache_bytes")):
+        raise ValueError("Index footprint components do not sum")
+    return dict(actual_cached_nodes=cache["nodes"], footprint_status="ok",
+                adjacency_bytes=adjacency, payload_bytes=payload, record_metadata_bytes=metadata,
+                state_cache_bytes=state, vector_record_bytes=payload + metadata,
+                cached_data_bytes=cached_data, cached_data_gib=cached_data / 2**30,
+                lookup_bytes=cache["graph_lookup_bytes"], cache_bytes=cache["total_bytes"],
+                pq_code_bytes=memory["pq_code_bytes"], pq_table_bytes=memory["pq_table_bytes"],
+                entrypoint_bytes=memory["entrypoint_bytes"], accounted_index_bytes=memory["accounted_index_bytes"],
+                nhood_buckets=cache.get("nhood_buckets", ""), coord_buckets=cache.get("coord_buckets", ""),
+                payload_ratio_f32=cache["nodes"] * dimension * 4 / payload)
+
+
+def cache_case(value):
+    try:
+        codec, count = value.split(":")
+        count = int(count)
+    except ValueError:
+        raise argparse.ArgumentTypeError("Expected CODEC:NODES, e.g. dexor:100000000")
+    if codec not in CODECS or count < 1:
+        raise argparse.ArgumentTypeError("Expected a supported codec and a positive node count")
+    return codec, count
 
 
 def summarize_rounds(path, args):
@@ -100,8 +159,10 @@ def main():
     for option in ("binary", "index", "query", "gt", "output"):
         p.add_argument("--"+option, type=Path, required=True)
     p.add_argument("--expected-points", type=int, default=1000000000)
-    p.add_argument("--nodes", type=int, nargs="+", default=[10000000,25000000,50000000])
-    p.add_argument("--codecs", nargs="+", choices=CODECS, default=list(CODECS))
+    p.add_argument("--nodes", type=int, nargs="+")
+    p.add_argument("--codecs", nargs="+", choices=CODECS)
+    p.add_argument("--cases", type=cache_case, nargs="+", metavar="CODEC:NODES",
+                   help="Ordered explicit cases, instead of the --codecs x --nodes product")
     p.add_argument("--L", type=int, nargs="+", default=[1,2,3,4,5,6,8,10])
     p.add_argument("--load-threads", type=int, default=32)
     p.add_argument("--rounds", type=int, default=10)
@@ -110,11 +171,22 @@ def main():
     p.add_argument("--verify-cache", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     args=p.parse_args()
+    if args.cases:
+        if args.nodes is not None or args.codecs is not None:
+            p.error("--cases cannot be combined with --nodes or --codecs")
+        cases = args.cases
+        if len(set(cases)) != len(cases):
+            p.error("Duplicate explicit cache cases")
+        args.nodes = list(dict.fromkeys(nodes for codec, nodes in cases))
+        args.codecs = list(dict.fromkeys(codec for codec, nodes in cases))
+    else:
+        args.nodes = args.nodes if args.nodes is not None else [10000000,25000000,50000000]
+        args.codecs = args.codecs if args.codecs is not None else list(CODECS)
+        cases = [(codec,nodes) for codec in args.codecs for nodes in args.nodes]
     if args.rounds < 2 or args.load_threads < 1 or args.beamwidth < 1 or min(args.nodes) < 1 or min(args.L) < 1:
         p.error("positive nodes/threads/L/beamwidth and at least two rounds required")
     if len(set(args.nodes)) != len(args.nodes) or len(set(args.codecs)) != len(args.codecs) or len(set(args.L)) != len(args.L):
         p.error("Duplicate nodes, codecs or L")
-    cases=[(codec,nodes) for codec in args.codecs for nodes in args.nodes]
     def command(codec,nodes,run_dir):
         cmd=[str(args.binary),"--data_type","float","--dist_fn","l2","--index_path_prefix",str(args.index),
              "--query_file",str(args.query),"--gt_file",str(args.gt),"--cache_codec",codec,
@@ -149,6 +221,8 @@ def main():
     identity={"inputs":{k:file_identity(v) for k,v in paths.items()},
               "config":{"nodes":args.nodes,"codecs":args.codecs,"L":args.L,"load_threads":args.load_threads,
                         "rounds":args.rounds,"beamwidth":args.beamwidth,"verify_cache":args.verify_cache}}
+    if args.cases:
+        identity["config"]["cases"] = [list(case) for case in cases]
     args.output.mkdir(parents=True,exist_ok=True)
     print("Output directory:",args.output,flush=True)
     with (args.output/".lock").open("w") as lock:
@@ -181,9 +255,11 @@ def main():
                           process_wall_seconds=wall,cache_load_threads=args.load_threads,
                           alp_encode_threads=args.load_threads if codec=="alp" else 0,
                           lvc_build_threads=args.load_threads if codec in ("dexor","gorilla","elf") else 0,
-                          query_threads=1,beamwidth=args.beamwidth,source_dir=str(run_dir))
+                          query_threads=1,beamwidth=args.beamwidth,source_dir=str(run_dir),footprint_status="unavailable")
                 try:
                     text=(run_dir/"search.log").read_text(errors="replace")
+                    if "INDEX_MEMORY " in text:
+                        base.update(footprint_from_log(run_dir/"search.log", dim))
                     if result.returncode: raise ValueError("search failed: exit "+str(result.returncode))
                     cache=budget_from_log(run_dir/"search.log"); memory=fields_from_line(text,"INDEX_MEMORY")
                     cfg=fields_from_line(text,"CACHE_READ_CONFIG"); timing=fields_from_line(text,"LVC_LOAD_TIMING")
@@ -235,7 +311,10 @@ def main():
                     if nodes in forest_hashes and forest_hashes[nodes]!=fh:raise RuntimeError("Reused forest hash mismatch")
                     forest_hashes[nodes]=fh
             all_rows.extend(rows)
+            write_summary(case_dir/"summary.csv",rows)
+            write_footprint(case_dir/"footprint.csv",rows)
             write_summary(args.output/"summary.csv",all_rows)
+            write_footprint(args.output/"footprint.csv",all_rows)
             write_json(args.output/"status.json",dict(completed_cases=case_number,total_cases=len(cases),failed_cases=failed,last_case=tag))
         print("Results:",args.output/"summary.csv",flush=True)
         return 1 if failed else 0
