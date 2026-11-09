@@ -830,6 +830,11 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
     T *aligned_query = scratch->aligned_query();
 
     float *pq_dists = nullptr;
+    const float dynamic_alpha = search_invocation ? _dynamic_query_alpha : _dynamic_insert_alpha;
+    const bool dynamic_filter = _dynamic_pq != nullptr && dynamic_alpha < 1.0f;
+    std::vector<float> dynamic_lut;
+    if constexpr (std::is_same_v<T, float>)
+        if (dynamic_filter) _dynamic_pq->prepare(aligned_query, dynamic_lut);
 
     _pq_data_store->preprocess_query(aligned_query, scratch);
 
@@ -860,8 +865,13 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
     };
 
     // Lambda to batch compute query<-> node distances in PQ space
-    auto compute_dists = [this, scratch, pq_dists](const std::vector<uint32_t> &ids, std::vector<float> &dists_out) {
-        _pq_data_store->get_distance(scratch->aligned_query(), ids, dists_out, scratch);
+    auto compute_dists = [this, scratch, pq_dists, dynamic_filter, &dynamic_lut](const std::vector<uint32_t> &ids, std::vector<float> &dists_out) {
+        if (dynamic_filter)
+        {
+            dists_out.resize(ids.size());
+            for (size_t i = 0; i < ids.size(); ++i) dists_out[i] = _dynamic_pq->distance(ids[i], dynamic_lut);
+        }
+        else _pq_data_store->get_distance(scratch->aligned_query(), ids, dists_out, scratch);
     };
 
     // Initialize the candidate pool with starting points
@@ -1002,7 +1012,23 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
         compute_dists(id_scratch, dist_scratch);
         // cmps += (uint32_t)id_scratch.size(); // 这个 cmps 是用来统计 PQ 距离计算的数量的，不是精确距离的计算次数
 
-        if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
+        if (dynamic_filter)
+        {
+            std::vector<size_t> order(id_scratch.size());
+            std::iota(order.begin(), order.end(), 0);
+            std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+                return dist_scratch[a] != dist_scratch[b] ? dist_scratch[a] < dist_scratch[b]
+                                                        : id_scratch[a] < id_scratch[b];
+            });
+            const size_t keep = std::min(order.size(), std::max<size_t>(1, size_t(std::ceil(dynamic_alpha * order.size()))));
+            cmps += uint32_t(keep);
+            for (size_t i = 0; i < keep; ++i)
+            {
+                const uint32_t id = id_scratch[order[i]];
+                best_L_nodes.insert(Neighbor(id, _data_store->get_distance(aligned_query, id)));
+            }
+        }
+        else if (search_invocation && _pq_dist && _pq_exact_rerank_ratio > 0.0f)
         {
             std::vector<std::pair<uint32_t, float>> temp_cands;
             for (size_t m = 0; m < id_scratch.size(); ++m)
@@ -3018,6 +3044,13 @@ int Index<T, TagT, LabelT>::insert_point(const T *point, const TagT tag, const s
                                     -1, __FUNCSIG__, __FILE__, __LINE__);
     }
 
+    // Cache lifetime spans candidate search, robust pruning and reverse-link updates.
+    struct InsertDecodeScope
+    {
+        AbstractDataStore<T> *store;
+        explicit InsertDecodeScope(AbstractDataStore<T> *value) : store(value) { store->begin_insert(); }
+        ~InsertDecodeScope() { store->end_insert(); }
+    } decode_scope(_data_store.get());
     std::shared_lock<std::shared_timed_mutex> shared_ul(_update_lock);
     std::unique_lock<std::shared_timed_mutex> tl(_tag_lock);
     std::unique_lock<std::shared_timed_mutex> dl(_delete_lock);
@@ -3113,6 +3146,13 @@ int Index<T, TagT, LabelT>::insert_point(const T *point, const TagT tag, const s
     }
     tl.unlock();
 
+    if constexpr (std::is_same_v<T, float>)
+        if (_dynamic_pq != nullptr)
+        {
+            const auto pq_begin = std::chrono::steady_clock::now();
+            _dynamic_pq->set_vector(uint32_t(location), point);
+            _dynamic_pq_encode_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - pq_begin).count();
+        }
     _data_store->set_vector(location, point); // update datastore
 
     // Find and add appropriate graph edges

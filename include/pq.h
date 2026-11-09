@@ -31,6 +31,7 @@ class FixedChunkPQTable
 #endif
 
     uint32_t get_num_chunks();
+    uint64_t get_dimension() const { return ndims; }
 
     // Allocated PQ arrays only; allocator metadata and object overhead excluded.
     uint64_t accounted_memory_bytes() const {
@@ -42,6 +43,9 @@ class FixedChunkPQTable
     }
 
     void preprocess_query(float *query_vec);
+
+    // Encode one vector with the loaded codebook (no retraining).
+    void encode_vector(const float *vector, uint8_t *code);
 
     // assumes pre-processed query
     void populate_chunk_distances(const float *query_vec, float *dist_vec);

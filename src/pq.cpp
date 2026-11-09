@@ -188,6 +188,19 @@ void FixedChunkPQTable::preprocess_query(float *query_vec)
     }
 }
 
+// Encode an original vector using the existing trained tables.
+void FixedChunkPQTable::encode_vector(const float *vector, uint8_t *code)
+{
+    if (tables == nullptr || n_chunks == 0) throw std::runtime_error("PQ codebook is not loaded");
+    std::vector<float> query(vector, vector + ndims), distances(256 * n_chunks);
+    preprocess_query(query.data());
+    populate_chunk_distances(query.data(), distances.data());
+    for (size_t c = 0; c < n_chunks; ++c)
+        code[c] = static_cast<uint8_t>(std::min_element(distances.begin() + 256 * c,
+                                                     distances.begin() + 256 * (c + 1)) -
+                                       (distances.begin() + 256 * c));
+}
+
 // assumes pre-processed query
 void FixedChunkPQTable::populate_chunk_distances(const float *query_vec, float *dist_vec)
 {

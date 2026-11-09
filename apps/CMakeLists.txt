@@ -47,3 +47,14 @@ if (NOT MSVC)
             RUNTIME
     )
 endif()
+
+# Dynamic ALP experiment; the source can also be compiled against test_bigann
+# without this definition for its native F32 datastore and graph update path.
+if(NOT MSVC)
+add_executable(test_dynamic_lvc_vamana test_dynamic_lvc_vamana.cpp)
+target_compile_definitions(test_dynamic_lvc_vamana PRIVATE DISKANN_LVC_DYNAMIC)
+target_link_libraries(test_dynamic_lvc_vamana ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS})
+
+add_executable(prepare_dynamic_lvc_vamana prepare_dynamic_lvc_vamana.cpp)
+target_link_libraries(prepare_dynamic_lvc_vamana ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS})
+endif()

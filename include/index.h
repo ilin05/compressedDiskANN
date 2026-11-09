@@ -24,6 +24,7 @@
 
 #include "quantized_distance.h"
 #include "pq_data_store.h"
+#include "dynamic_vamana_pq.h"
 
 #define OVERHEAD_FACTOR 1.1
 #define EXPAND_IF_FULL 0
@@ -87,6 +88,22 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     DISKANN_DLLEXPORT size_t get_num_points();
     DISKANN_DLLEXPORT size_t get_max_points();
     DISKANN_DLLEXPORT void set_pq_exact_rerank_ratio(float ratio);
+    // Experiment-only serial filters; independent of PQ-based graph construction.
+    void set_dynamic_pq(std::shared_ptr<DynamicVamanaPQ> pq, float insert_alpha, float query_alpha)
+    {
+        if (!_dynamic_index || _pq_dist || !pq || !std::isfinite(insert_alpha) || !std::isfinite(query_alpha) ||
+            insert_alpha <= 0 || insert_alpha > 1 || query_alpha <= 0 || query_alpha > 1)
+            throw std::runtime_error("Invalid dynamic PQ/filter configuration");
+        if constexpr (!std::is_same_v<T, float>) throw std::runtime_error("Dynamic PQ requires float payloads");
+        _dynamic_pq = std::move(pq); _dynamic_insert_alpha = insert_alpha; _dynamic_query_alpha = query_alpha;
+    }
+    void set_dynamic_query_alpha(float alpha)
+    {
+        if (!std::isfinite(alpha) || alpha <= 0 || alpha > 1) throw std::runtime_error("Invalid query alpha");
+        _dynamic_query_alpha = alpha;
+    }
+    double dynamic_pq_encode_seconds() const { return _dynamic_pq_encode_seconds; }
+
     DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio) override;
 
     DISKANN_DLLEXPORT bool detect_common_filters(uint32_t point_id, bool search_invocation,
@@ -335,6 +352,8 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
 #endif
 
   private:
+    // Narrow access for the serial static-import/update benchmark adapter.
+    friend class DynamicVamanaExperiment;
     // Distance functions
     Metric _dist_metric = diskann::L2;
 
@@ -411,6 +430,10 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
     std::shared_ptr<QuantizedDistance<T>> _pq_distance_fn = nullptr;
     std::shared_ptr<AbstractDataStore<T>> _pq_data_store = nullptr;
     bool _pq_generated = false;
+    std::shared_ptr<DynamicVamanaPQ> _dynamic_pq;
+    float _dynamic_insert_alpha = 1.0f, _dynamic_query_alpha = 1.0f;
+    double _dynamic_pq_encode_seconds = 0;
+
     FixedChunkPQTable _pq_table;
 
     //

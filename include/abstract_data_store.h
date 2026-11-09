@@ -69,6 +69,11 @@ template <typename data_t> class AbstractDataStore
     virtual void set_vector(const location_t i, const data_t *const vector) = 0;
     virtual void prefetch_vector(const location_t loc) = 0;
 
+    // Serial insertion scopes may reuse decoded vectors; other stores need no hooks.
+    virtual void begin_insert() {}
+    virtual void end_insert() {}
+
+
     // internal shuffle operations to move around vectors
     // will bulk-move all the vectors in [old_start_loc, old_start_loc +
     // num_points) to [new_start_loc, new_start_loc + num_points) and set the old
