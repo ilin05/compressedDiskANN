@@ -1,0 +1,47 @@
+{
+  "stage": "correctness",
+  "backend": "alp",
+  "insert_alpha": 1.0,
+  "query_alpha": "1",
+  "batches": 2,
+  "ratio": 0.01,
+  "L": "1,2,5,10",
+  "rounds": 3,
+  "search_every": 1,
+  "seed": 20261015,
+  "query_count": 0,
+  "insert_cache": false,
+  "pq_bytes": 32,
+  "files": [
+    {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_1M.fbin",
+      "bytes": 512000008,
+      "mtime_ns": 1776177569532709271
+    },
+    {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin",
+      "bytes": 5120008,
+      "mtime_ns": 1776180076332355051
+    },
+    {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_1M_gt.bin",
+      "bytes": 80000008,
+      "mtime_ns": 1776180077539347576
+    },
+    {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/memory_index_bigann_1M_R32_L50_A1.2",
+      "bytes": 117386104,
+      "mtime_ns": 1776177570435704227
+    },
+    {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/compressed_memory_index_bigann_1M_R32_L50_A1.2.data",
+      "bytes": 138477784,
+      "mtime_ns": 1794204018618799480
+    },
+    {
+      "path": "/home/zmy/compressedDiskANN/build/apps/test_dynamic_lvc_vamana",
+      "bytes": 6665848,
+      "mtime_ns": 1794204010622821218
+    }
+  ]
+}
