@@ -1,0 +1,1693 @@
+nohup: ignoring input
+[BigANN-1B] Search with num_nodes_to_cache=0
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x710d21c71000 to thread-id:124301211228096
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 0 nodes around medoid(s)
+Caching 0...
+Level: 1. #nodes: 0, #nodes thus far: 0
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 31391208 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         1220.12          779.45         2172.80            7.24          731.90           30.45           46.70
+Peak RSS after search (L=1): 31392104 KB
+     2           2          762.16         1265.65         2505.80           17.17         1158.24           73.67           86.13
+Peak RSS after search (L=2): 31392552 KB
+     3           2          656.73         1473.85         2816.90           20.63         1345.82           87.08           94.66
+Peak RSS after search (L=3): 31392552 KB
+     4           2          610.05         1590.75         2975.10           22.82         1453.38           93.09           97.34
+Peak RSS after search (L=4): 31392552 KB
+     5           2          567.38         1711.96         3137.70           24.52         1559.65          104.66           98.32
+Peak RSS after search (L=5): 31392552 KB
+     6           2          535.35         1817.10         3321.50           26.08         1654.48          111.65           98.95
+Peak RSS after search (L=6): 31392552 KB
+     8           2          485.51         2007.16         3682.20           28.83         1824.09          126.33           99.48
+Peak RSS after search (L=8): 31392552 KB
+    10           2          448.21         2176.03         3973.00           31.30         1974.33          139.67           99.64
+Peak RSS after search (L=10): 31393000 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C0_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x796037e9b000 to thread-id:133454157699008
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 0 nodes around medoid(s)
+Caching 0...
+Level: 1. #nodes: 0, #nodes thus far: 0
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 31391064 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          442.51         2203.69         4084.30           31.30         1991.84          150.98           99.00
+Peak RSS after search (L=10): 31393752 KB
+    11           2          427.82         2281.25         4125.20           32.47         2063.82          154.88           99.20
+Peak RSS after search (L=11): 31394200 KB
+    12           2          415.25         2351.36         4313.40           33.63         2128.25          157.96           99.34
+Peak RSS after search (L=12): 31395096 KB
+    13           2          401.97         2430.12         4470.90           34.72         2196.80          166.14           99.45
+Peak RSS after search (L=13): 31395544 KB
+    14           2          389.26         2510.82         4570.60           35.84         2269.08          169.97           99.55
+Peak RSS after search (L=14): 31396440 KB
+    16           2          368.58         2654.31         4917.50           37.96         2395.91          183.17           99.66
+Peak RSS after search (L=16): 31397336 KB
+    18           2          350.14         2796.00         5227.00           40.03         2522.69          194.02           99.73
+Peak RSS after search (L=18): 31397784 KB
+    20           2          333.62         2935.62         5425.50           42.06         2647.34          206.10           99.80
+Peak RSS after search (L=20): 31398232 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C0_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=2500000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x74c3050e5000 to thread-id:128380933998528
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 2500000 nodes around medoid(s)
+Caching 2500000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4...................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5. #nodes: 2391798, #nodes thus far: 2500000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 34262172 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         2448.62          368.28         1674.80            2.89          325.08           26.28           46.70
+Peak RSS after search (L=1): 34262620 KB
+     2           2         1277.99          736.10         1923.50            8.61          629.81           68.79           86.13
+Peak RSS after search (L=2): 34262620 KB
+     3           2         1026.47          925.58         2259.40           11.55          795.87           84.50           94.66
+Peak RSS after search (L=3): 34262620 KB
+     4           2          899.04         1060.48         2438.90           13.61          915.85           94.51           97.34
+Peak RSS after search (L=4): 34263068 KB
+     5           2          817.80         1171.04         2549.20           15.26         1013.05          103.22           98.32
+Peak RSS after search (L=5): 34263068 KB
+     6           2          752.67         1276.11         2731.60           16.80         1105.72          111.15           98.95
+Peak RSS after search (L=6): 34263516 KB
+     8           2          659.77         1460.59         3051.10           19.52         1269.79          124.84           99.48
+Peak RSS after search (L=8): 34263516 KB
+    10           2          593.54         1629.52         3426.70           21.97         1417.86          138.88           99.64
+Peak RSS after search (L=10): 34263516 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C2500000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x72cd9f4a9000 to thread-id:126227462141888
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 2500000 nodes around medoid(s)
+Caching 2500000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4...................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5. #nodes: 2391798, #nodes thus far: 2500000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 34261424 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          600.88         1608.50         3356.60           21.97         1410.77          126.16           99.00
+Peak RSS after search (L=10): 34261872 KB
+    11           2          570.54         1695.53         3403.40           23.14         1487.63          131.37           99.20
+Peak RSS after search (L=11): 34261872 KB
+    12           2          544.97         1778.84         3686.10           24.30         1559.73          138.35           99.34
+Peak RSS after search (L=12): 34261872 KB
+    13           2          523.75         1851.94         3821.40           25.38         1625.91          142.49           99.45
+Peak RSS after search (L=13): 34261872 KB
+    14           2          505.81         1919.84         3884.20           26.49         1687.28          147.81           99.55
+Peak RSS after search (L=14): 34261872 KB
+    16           2          472.01         2060.27         4300.50           28.60         1813.40          157.34           99.66
+Peak RSS after search (L=16): 34261872 KB
+    18           2          441.02         2207.53         4939.10           30.67         1943.84          168.51           99.73
+Peak RSS after search (L=18): 34261872 KB
+    20           2          415.79         2343.59         5104.70           32.69         2065.51          177.70           99.80
+Peak RSS after search (L=20): 34261872 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C2500000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=5000000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x737941303000 to thread-id:126964603643840
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 5000000 nodes around medoid(s)
+Caching 5000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5............................................................................................ #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 2474368, #nodes thus far: 5000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 37665772 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         2491.99          361.59         1673.40            2.83          319.63           24.55           46.70
+Peak RSS after search (L=1): 37666220 KB
+     2           2         1290.42          728.44         2275.30            8.44          629.07           61.46           86.13
+Peak RSS after search (L=2): 37666220 KB
+     3           2         1043.27          909.06         2251.80           11.36          788.36           75.71           94.66
+Peak RSS after search (L=3): 37666220 KB
+     4           2          915.76         1041.22         2421.20           13.40          906.14           85.24           97.34
+Peak RSS after search (L=4): 37666220 KB
+     5           2          716.27         1366.47         4121.90           15.04         1216.55           94.57           98.32
+Peak RSS after search (L=5): 37666220 KB
+     6           2          689.35         1418.89         4781.30           16.58         1256.84          102.66           98.95
+Peak RSS after search (L=6): 37666220 KB
+     8           2          668.59         1441.84         3043.20           19.28         1261.54          113.88           99.48
+Peak RSS after search (L=8): 37666220 KB
+    10           2          595.07         1624.26         4102.60           21.73         1423.90          125.72           99.64
+Peak RSS after search (L=10): 37666220 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C5000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x7a5e937b5000 to thread-id:134546614708160
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 5000000 nodes around medoid(s)
+Caching 5000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5............................................................................................ #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 2474368, #nodes thus far: 5000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 37665772 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          593.78         1629.24         3415.80           21.73         1415.40          139.40           99.00
+Peak RSS after search (L=10): 37665772 KB
+    11           2          565.78         1711.81         3518.30           22.89         1487.17          146.42           99.20
+Peak RSS after search (L=11): 37665772 KB
+    12           2          541.39         1789.59         3700.70           24.05         1556.63          151.62           99.34
+Peak RSS after search (L=12): 37665772 KB
+    13           2          519.73         1866.44         3807.70           25.12         1623.40          158.14           99.45
+Peak RSS after search (L=13): 37665772 KB
+    14           2          500.66         1939.07         3875.50           26.23         1686.70          163.62           99.55
+Peak RSS after search (L=14): 37665772 KB
+    16           2          468.06         2077.26         4380.70           28.33         1812.35          173.20           99.66
+Peak RSS after search (L=16): 37665772 KB
+    18           2          438.80         2219.33         4632.10           30.39         1940.43          181.36           99.73
+Peak RSS after search (L=18): 37665772 KB
+    20           2          413.46         2357.56         4770.20           32.40         2061.38          193.60           99.80
+Peak RSS after search (L=20): 37665772 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C5000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=10000000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x7e86d96c9000 to thread-id:139117634303936
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 10000000 nodes around medoid(s)
+Caching 10000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 7474368, #nodes thus far: 10000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 43862760 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         2577.60          348.80         1654.60            2.74          306.62           25.20           46.70
+Peak RSS after search (L=1): 43863208 KB
+     2           2         1323.41          708.73         1875.70            8.20          606.88           64.00           86.13
+Peak RSS after search (L=2): 43863208 KB
+     3           2         1050.50          901.43         2222.10           11.06          775.70           78.46           94.66
+Peak RSS after search (L=3): 43863208 KB
+     4           2          920.53         1035.44         2426.30           13.08          893.88           90.00           97.34
+Peak RSS after search (L=4): 43863208 KB
+     5           2          839.78         1139.26         2561.20           14.70          987.82           95.90           98.32
+Peak RSS after search (L=5): 43863656 KB
+     6           2          771.93         1242.87         2726.70           16.22         1079.54          103.01           98.95
+Peak RSS after search (L=6): 43863656 KB
+     8           2          675.49         1425.36         3013.70           18.90         1241.70          117.04           99.48
+Peak RSS after search (L=8): 43863656 KB
+    10           2          603.65         1601.92         3388.60           21.33         1396.15          131.10           99.64
+Peak RSS after search (L=10): 43863656 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C10000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x728cca1cd000 to thread-id:125949006735296
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 10000000 nodes around medoid(s)
+Caching 10000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 7474368, #nodes thus far: 10000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 43864012 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          604.64         1597.86         3353.10           21.33         1397.88          125.88           99.00
+Peak RSS after search (L=10): 43866252 KB
+    11           2          575.79         1680.32         3440.20           22.48         1470.13          131.82           99.20
+Peak RSS after search (L=11): 43866700 KB
+    12           2          550.36         1759.97         3601.60           23.63         1540.39          137.34           99.34
+Peak RSS after search (L=12): 43867148 KB
+    13           2          528.99         1833.44         3868.10           24.70         1603.97          144.55           99.45
+Peak RSS after search (L=13): 43868044 KB
+    14           2          509.40         1904.30         3877.40           25.79         1667.15          149.59           99.55
+Peak RSS after search (L=14): 43868940 KB
+    16           2          474.59         2047.25         4381.30           27.89         1796.10          156.60           99.66
+Peak RSS after search (L=16): 43869388 KB
+    18           2          444.17         2190.56         4550.50           29.93         1924.90          167.15           99.73
+Peak RSS after search (L=18): 43870284 KB
+    20           2          419.58         2321.24         4732.00           31.93         2039.94          178.37           99.80
+Peak RSS after search (L=20): 43870732 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C10000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=20000000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x7f261b409000 to thread-id:139801639020480
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 20000000 nodes around medoid(s)
+Caching 20000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 17474368, #nodes thus far: 20000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 56919144 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         2690.46          331.88         1617.60            2.58          289.63           25.06           46.70
+Peak RSS after search (L=1): 56920040 KB
+     2           2         1364.61          685.72         1860.00            7.77          584.75           62.56           86.13
+Peak RSS after search (L=2): 56920488 KB
+     3           2         1085.45          872.01         2221.30           10.54          747.59           77.35           94.66
+Peak RSS after search (L=3): 56920488 KB
+     4           2          948.37         1003.98         2328.90           12.51          866.39           85.95           97.34
+Peak RSS after search (L=4): 56920488 KB
+     5           2          853.86         1118.77         2891.40           14.11          968.52           93.95           98.32
+Peak RSS after search (L=5): 56920936 KB
+     6           2          787.86         1216.29         2835.90           15.60         1054.55          100.86           98.95
+Peak RSS after search (L=6): 56920936 KB
+     8           2          688.36         1398.76         2978.20           18.24         1216.50          113.63           99.48
+Peak RSS after search (L=8): 56920936 KB
+    10           2          615.03         1569.76         3475.70           20.63         1368.48          125.42           99.64
+Peak RSS after search (L=10): 56920936 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C20000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x7d974213f000 to thread-id:138088597202880
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 20000000 nodes around medoid(s)
+Caching 20000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 17474368, #nodes thus far: 20000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 56916344 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          620.08         1556.35         3283.10           20.63         1358.24          124.07           99.00
+Peak RSS after search (L=10): 56918584 KB
+    11           2          588.00         1644.06         3590.90           21.77         1435.77          130.22           99.20
+Peak RSS after search (L=11): 56919032 KB
+    12           2          563.25         1718.08         3653.90           22.91         1501.39          136.34           99.34
+Peak RSS after search (L=12): 56919480 KB
+    13           2          541.00         1789.93         3752.60           23.96         1564.79          141.41           99.45
+Peak RSS after search (L=13): 56920376 KB
+    14           2          520.14         1863.61         3846.50           25.04         1631.58          144.72           99.55
+Peak RSS after search (L=14): 56921272 KB
+    16           2          483.95         2007.27         5491.90           27.10         1757.91          156.22           99.66
+Peak RSS after search (L=16): 56921720 KB
+    18           2          452.38         2149.95         6690.90           29.12         1884.04          166.73           99.73
+Peak RSS after search (L=18): 56922616 KB
+    20           2          426.05         2286.00         8653.80           31.09         2003.31          179.06           99.80
+Peak RSS after search (L=20): 56923512 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C20000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=50000000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x744fdb3d5000 to thread-id:127886324328384
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 50000000 nodes around medoid(s)
+Caching 50000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................. #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 47474368, #nodes thus far: 50000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 120049900 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         2917.62          324.82         2131.50            2.13          237.81           69.09           46.70
+Peak RSS after search (L=1): 120049900 KB
+     2           2         1445.10          678.12         2652.20            6.47          494.57          142.90           86.13
+Peak RSS after search (L=2): 120049900 KB
+     3           2         1138.31          851.15         3922.60            9.01          659.33          141.99           94.66
+Peak RSS after search (L=3): 120049900 KB
+     4           2         1000.64          955.39         2993.00           10.85          773.36          127.06           97.34
+Peak RSS after search (L=4): 120049900 KB
+     5           2          907.81         1052.43         3149.50           12.37          867.53          125.82           98.32
+Peak RSS after search (L=5): 120049900 KB
+     6           2          832.24         1151.33         3293.40           13.79          956.87          130.98           98.95
+Peak RSS after search (L=6): 120049900 KB
+     8           2          715.58         1345.87         5959.60           16.33         1119.59          154.25           99.48
+Peak RSS after search (L=8): 120049900 KB
+    10           2          641.04         1506.62         6240.80           18.62         1264.42          163.37           99.64
+Peak RSS after search (L=10): 120049900 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C50000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x72ebcaa7c000 to thread-id:126357038892992
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 50000000 nodes around medoid(s)
+Caching 50000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................. #nodes: 2417430, #nodes thus far: 2525632
+Level: 6. #nodes: 47474368, #nodes thus far: 50000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 120047228 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          614.07         1655.40         4621.90           18.62         1253.88          321.81           99.00
+Peak RSS after search (L=10): 120047228 KB
+    11           2          611.56         1578.84         6170.30           19.71         1336.82          159.78           99.20
+Peak RSS after search (L=11): 120047228 KB
+    12           2          580.19         1666.54         6467.00           20.80         1414.39          165.24           99.34
+Peak RSS after search (L=12): 120047228 KB
+    13           2          559.76         1729.59         7744.30           21.81         1470.51          168.60           99.45
+Peak RSS after search (L=13): 120047228 KB
+    14           2          535.94         1807.78         9115.80           22.85         1538.19          176.08           99.55
+Peak RSS after search (L=14): 120047228 KB
+    16           2          493.35         1969.38         8828.10           24.84         1675.47          193.45           99.66
+Peak RSS after search (L=16): 120047228 KB
+    18           2          464.64         2092.13        10530.90           26.78         1785.88          201.12           99.73
+Peak RSS after search (L=18): 120047228 KB
+    20           2          434.77         2238.22        11234.00           28.68         1913.68          212.80           99.80
+Peak RSS after search (L=20): 120047228 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C50000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+[BigANN-1B] Search with num_nodes_to_cache=100000000
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x716c0a0ee000 to thread-id:124708820879296
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 100000000 nodes around medoid(s)
+Caching 100000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5.......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................. #nodes: 48042044, #nodes thus far: 50567676
+Level: 7. #nodes: 49432324, #nodes thus far: 100000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 192479980 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)        Recall@1
+===================================================================================================================================
+     1           2         3089.82          296.47         2001.70            1.96          222.70           51.41           46.70
+Peak RSS after search (L=1): 192479980 KB
+     2           2         1532.16          629.58         2666.50            5.95          469.59          111.59           86.13
+Peak RSS after search (L=2): 192479980 KB
+     3           2         1221.25          774.11         3992.90            8.30          621.35          100.84           94.66
+Peak RSS after search (L=3): 192479980 KB
+     4           2         1061.16          893.02         3190.70           10.01          733.18          103.50           97.34
+Peak RSS after search (L=4): 192479980 KB
+     5           2          961.05          989.36         3292.50           11.44          822.77          107.03           98.32
+Peak RSS after search (L=5): 192479980 KB
+     6           2          880.02         1084.72         3738.90           12.76          907.48          113.25           98.95
+Peak RSS after search (L=6): 192479980 KB
+     8           2          758.40         1265.11         3649.90           15.13         1061.71          131.43           99.48
+Peak RSS after search (L=8): 192479980 KB
+    10           2          675.74         1424.17         4767.40           17.28         1203.24          140.84           99.64
+Peak RSS after search (L=10): 192479980 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K1_T1_C100000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_1_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_1_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_2_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_2_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_3_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_3_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_4_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_4_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_5_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_5_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_6_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_6_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_8_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_8_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_10_dists_float.bin
+bin: #pts = 10000, #dims = 1, size = 40008B
+Finished writing bin.
+Clearing scratch
+Search parameters: #threads: 1,  beamwidth: 2.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin ...Metadata: #pts = 10000, #dims = 128, aligned_dim = 128... allocating aligned memory of 5120000 bytes... done. Copying data to mem_aligned buffer... done.
+Opened: /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin, size: 80000008, cache_size: 67108864
+Reading truthset file /home/zmy/compressedDiskANN/build/data/bigann/bigann_1B_gt.bin ...
+Metadata: #pts = 10000, #dims = 1000... 
+L2: Using AVX2 distance computation DistanceL2Float
+L2: Using AVX2 distance computation DistanceL2Float
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_compressed.bin... 
+Metadata: #pts = 1000000000, #dims = 32...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 4, #dims = 1...
+done.
+Offsets: 4096 135176 135696 135836
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 256, #dims = 128...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 128, #dims = 1...
+done.
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_pq_pivots.bin... 
+Metadata: #pts = 33, #dims = 1...
+done.
+Loaded PQ Pivots: #ctrs: 256, #dims: 128, #chunks: 32
+Loaded PQ centroids and in-memory compressed vectors. #points: 1000000000 #dim: 128 #aligned_dim: 128 #chunks: 32
+Disk-Index File Meta-data: # nodes per sector: 6, max node len (bytes): 644, max node degree: 32
+Opened file : /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index
+Setting up thread-specific contexts for nthreads: 1
+allocating ctx: 0x7c310c88a000 to thread-id:136550101338048
+Reading bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin ...
+Opening bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_medoids.bin... 
+Metadata: #pts = 5, #dims = 1...
+done.
+Reading (with alignment) bin file /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_disk.index_centroids.bin ...Metadata: #pts = 5, #dims = 128, aligned_dim = 128... allocating aligned memory of 2560 bytes... done. Copying data to mem_aligned buffer... done.
+done..
+Caching 100000000 nodes around medoid(s)
+Caching 100000000...
+Level: 1.. #nodes: 5, #nodes thus far: 5
+Level: 2.. #nodes: 153, #nodes thus far: 158
+Level: 3...... #nodes: 4145, #nodes thus far: 4303
+Level: 4....................................................................................................... #nodes: 103899, #nodes thus far: 108202
+Level: 5.......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................... #nodes: 2417430, #nodes thus far: 2525632
+Level: 6.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................. #nodes: 48042044, #nodes thus far: 50567676
+Level: 7. #nodes: 49432324, #nodes thus far: 100000000
+done
+Loading the cache list into memory....done.
+Peak RSS after cache load: 191854936 KB
+Testing with 10 rounds per L value.
+     L   Beamwidth             QPS    Mean Latency    99.9 Latency        Mean IOs    Mean IO (us)         CPU (s)       Recall@10
+===================================================================================================================================
+    10           2          637.13         1570.25         6337.10           17.28         1216.11          238.41           99.00
+Peak RSS after search (L=10): 191854936 KB
+    11           2          647.07         1488.95         4482.10           18.31         1269.65          132.80           99.20
+Peak RSS after search (L=11): 191854936 KB
+    12           2          615.93         1566.85         4600.20           19.34         1339.42          137.26           99.34
+Peak RSS after search (L=12): 191854936 KB
+    13           2          590.43         1636.22         4871.60           20.28         1401.18          141.77           99.45
+Peak RSS after search (L=13): 191854936 KB
+    14           2          566.14         1707.86         6239.40           21.25         1463.98          147.41           99.55
+Peak RSS after search (L=14): 191854936 KB
+    16           2          522.79         1854.06         6998.40           23.12         1588.98          160.59           99.66
+Peak RSS after search (L=16): 191854936 KB
+    18           2          487.91         1989.15         8459.10           24.95         1708.34          169.39           99.73
+Peak RSS after search (L=18): 191854936 KB
+    20           2          458.15         2121.68         9811.10           26.74         1826.90          177.64           99.80
+Peak RSS after search (L=20): 191854936 KB
+Saved search summary CSV to /home/zmy/compressedDiskANN/build/data/bigann/disk_index_bigann_1B_R32_L50_A1.2_K10_T1_C100000000_search_result.csv
+Done searching. Now saving results 
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_10_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_10_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_11_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_11_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_12_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_12_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_13_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_13_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_14_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_14_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_16_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_16_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_18_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_18_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_20_idx_uint32.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Writing bin: /home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_20_dists_float.bin
+bin: #pts = 10000, #dims = 10, size = 400008B
+Finished writing bin.
+Clearing scratch
+Done. CSV files are written next to the index prefix with _C<num_nodes_to_cache>_ in the file name.
