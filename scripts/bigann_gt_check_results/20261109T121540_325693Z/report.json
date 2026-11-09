@@ -1,0 +1,2234 @@
+{
+  "inputs": {
+    "base": {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_100M.fbin",
+      "bytes": 51200000008,
+      "mtime_utc": "2026-04-14T14:44:44.078949+00:00"
+    },
+    "queries": {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_query.fbin",
+      "bytes": 5120008,
+      "mtime_utc": "2026-04-14T15:21:16.332355+00:00"
+    },
+    "gt": {
+      "path": "/home/zmy/compressedDiskANN/build/data/bigann/bigann_100M_gt.bin",
+      "bytes": 80000008,
+      "mtime_utc": "2026-04-14T14:41:40.721976+00:00"
+    }
+  },
+  "base_shape": [
+    100000000,
+    128
+  ],
+  "query_shape": [
+    10000,
+    128
+  ],
+  "gt": {
+    "queries": 10000,
+    "neighbors": 1000,
+    "has_distances": true,
+    "invalid_ids": 0,
+    "all_zero_distance_rows": 9999,
+    "all_equal_distance_rows": 9999,
+    "nonfinite_distances": 0,
+    "negative_distances": 0,
+    "unsorted_distance_rows": 1,
+    "multiple_first_ties_percent": 99.99,
+    "first_ties_mean": 999.9001,
+    "first_ties_median": 1000.0,
+    "first_ties_max": 1000
+  },
+  "gt_sample_mismatches": 30,
+  "gt_validation": "sample_mismatch_or_gt_anomaly",
+  "query_ids": [
+    0,
+    1,
+    2,
+    10,
+    100,
+    9999
+  ],
+  "gt_ranks": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "atol": 0.001,
+  "rtol": 1e-05,
+  "result_files": [
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_100_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T16:43:28.591375+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_100_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T16:43:28.594375+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.204791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.204791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.204791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.205791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.205791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.205791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.205791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.206791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_15_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-04-16T14:07:31.867093+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_15_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-04-16T14:07:31.867093+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.206791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.206791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.206791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.206791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.207791+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-07-12T10:42:55.207791+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_30_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-16T14:07:31.874093+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_30_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-16T14:07:31.874093+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_40_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T14:58:17.267758+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_40_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T14:58:17.276757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_50_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T15:21:19.166337+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_50_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-04-14T16:43:28.589375+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-07-12T13:20:33.059102+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.352015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.352015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.353015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.354015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.355015+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T10:25:35.355015+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.613479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.613479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.611479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.611479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.611479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.611479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.611479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.612479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.613479+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_0_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T09:49:22.613479+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.849139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.849139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.849139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.850139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.850139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.851139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.851139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.851139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.852139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.852139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.852139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.853139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.853139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.853139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.854139+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T18:27:22.854139+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.030510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.030510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.028510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.028510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.028510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.028510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.028510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.029510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.030510+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_100000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T17:02:19.030510+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.081735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.082735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.083735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.084735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.084735+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:58:32.084735+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.802180+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.802180+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.799180+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.800179+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_10000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T12:25:26.801180+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.400234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.400234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.400234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.401234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.401234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.401234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.402234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.402234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.403234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.403234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.403234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.404234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.404234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.404234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.405234+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T03:53:56.405234+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.298129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_200000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T01:34:11.299129+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.505146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.506146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.506146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.506146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.506146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.507146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.507146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.507146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.508146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.508146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.508146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.508146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.509146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.509146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.509146+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T14:03:12.509146+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_20000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T13:25:12.168014+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.922231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.923231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.923231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.924231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.924231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.924231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.925231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.925231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.925231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.926231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.926231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.926231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.927231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.927231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.927231+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-24T19:06:47.927231+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.917458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_25000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-24T18:24:52.918458+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.878156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.878156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.878156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.879156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.879156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.879156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.880156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.880156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.880156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.880156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.881156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.881156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.881156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.881156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.882156+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T11:13:13.882156+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.830757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_2500000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T10:43:38.831757+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.255819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.256819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.256819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.257819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.257819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.257819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.258819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.258819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.258819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.259819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.259819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.260819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.260819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.260819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.261819+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T08:53:58.261819+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.936166+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.936166+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_400000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T06:21:30.935165+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.629372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.630372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.630372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.631372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.631372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.631372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.632372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.632372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.632372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.632372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.633372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.633372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.633372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.634372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.634372+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T15:47:17.634372+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.865546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.862546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.862546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.863546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_50000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T14:49:40.864546+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_10_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.589918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_10_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.589918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_11_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.590918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_11_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.590918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_12_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.590918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_12_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.591918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_13_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.591918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_13_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.591918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_14_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.592918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_14_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.592918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_16_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.592918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_16_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.592918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_18_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.593918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_18_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.593918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_20_idx_uint32.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.593918+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K10_20_dists_float.bin",
+        "bytes": 400008,
+        "mtime_utc": "2026-05-25T12:03:59.593918+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_10_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_10_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_1_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_1_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_2_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_2_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_3_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_3_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_4_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_4_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_5_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.551821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_5_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_6_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_6_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      }
+    },
+    {
+      "ids": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_8_idx_uint32.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      },
+      "distances": {
+        "path": "/home/zmy/compressedDiskANN/build/data/bigann/res_cache_5000000_K1_8_dists_float.bin",
+        "bytes": 40008,
+        "mtime_utc": "2026-05-25T11:32:58.552821+00:00"
+      }
+    }
+  ],
+  "orphan_distance_files": [],
+  "warnings": [
+    "30 sampled GT entries fail direct squared-L2 checks; stored-distance tie-aware recall is untrusted.",
+    "GT contains 9999 all-zero distance rows; verify that these are real duplicates before interpreting ties.",
+    "GT unsorted_distance_rows=1",
+    "res_10_idx_uint32.bin: build/data/bigann/res_10_idx_uint32.bin: size 400008, expected 40008; expected a dense 4-byte bin, not fvecs/ivecs",
+    "res_30_idx_uint32.bin: build/data/bigann/res_30_idx_uint32.bin: size 400008, expected 40008; expected a dense 4-byte bin, not fvecs/ivecs",
+    "res bin headers contain only shape, not codec/batch/round/index/query identity; matching shapes do not establish provenance.",
+    "Saved distance mismatches may indicate approximate scoring, incorrect input vectors, or mismatched/overwritten result pairs; they alone do not prove file corruption."
+  ],
+  "recall_definition": "Percent; first saved result ID; exact consecutive ties in stored GT distances, or strict matching for IDs-only GT. No GT repair performed."
+}
