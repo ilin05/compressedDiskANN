@@ -11,6 +11,9 @@ extra=()
 [[ ${RESUME:-0} != 1 ]] || extra+=(--resume)
 [[ ${VERIFY_CACHE:-0} != 1 ]] || extra+=(--verify-cache)
 [[ ${DRY_RUN:-0} != 1 ]] || extra+=(--dry-run)
+if [[ ${MEMORY_MONITOR:-0} == 1 ]]; then
+    extra+=(--memory-monitor --memory-sample-seconds "${MEMORY_SAMPLE_SECONDS:-5}")
+fi
 if [[ ${SKIP_BUILD:-0} != 1 && ${DRY_RUN:-0} != 1 ]]; then
     cmake -S "$repo" -B "$build" -DCMAKE_BUILD_TYPE=Release
     cmake --build "$build" --target search_disk_index --parallel "${BUILD_THREADS:-4}"

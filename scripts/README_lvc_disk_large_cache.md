@@ -92,3 +92,51 @@ Other overrides are `BUILD_DIR`, `DATA_DIR`, `INDEX_PREFIX`, `QUERY_FILE`,
 `EXPECTED_POINTS`, `BUILD_THREADS`, and `VERIFY_CACHE`.
 `VERIFY_CACHE=1` adds payload verification overhead and is for correctness checks,
 not the normal performance run. Existing GT/recall semantics are unchanged.
+
+## ALP 400M / DeXOR 100M recheck with swap diagnostics
+
+Use a new output directory; completed cases in an old directory would be reused:
+
+```bash
+OUTPUT_DIR="$PWD/scripts/lvc_large_cache_results/bigann_1B_swap_recheck" \
+  nohup bash scripts/test_lvc_disk_large_cache_swap_recheck_bigann_1B.sh \
+  > test_lvc_disk_large_cache_swap_recheck_bigann_1B_output.log 2>&1 &
+```
+
+The default order is ALP 400M, then DeXOR 100M, running sequentially. It uses the
+same native load/search settings as the full-cache test. Both cases include the
+existing footprint accounting and all query rounds. `CASES` can select only one
+case. `MEMORY_SAMPLE_SECONDS=5` is the default; no sudo is needed.
+
+Each `attempt_<n>` additionally contains:
+
+- `memory_samples.csv`: flushed periodic snapshots through loading and queries.
+  Target-process fields include VmRSS, VmHWM, VmSize, VmData, VmSwap, RssAnon,
+  RssFile, thread count, and cumulative minor/major faults. Host fields include
+  MemAvailable, SwapFree, SwapCached, and cumulative swap-in/out page counts.
+- `memory_summary.json`: sampled peak RSS/Swap, minimum available host memory,
+  sampling errors, and host swap-in/out byte deltas. These fields are also added
+  to the case/root `summary.csv` (case-wide, repeated for each L).
+- `memory_rounds.csv`: native per-round performance/fault counts joined to
+  snapshots inside that round. Before/after snapshots are included separately
+  for context; a round shorter than the interval may have zero inside snapshots.
+
+Process VmSwap and major-fault counts describe the target; host swap-in/out can
+include other processes. Periodic peaks can miss activity between snapshots.
+The monitor does not reset swap, drop caches, trim the allocator, or alter node
+counts/search behavior. It does not walk smaps on each sample. Monitoring has
+some overhead, so use the same interval for comparisons. Native nonzero exits
+retain sampled diagnostics, and the runner continues to the next case.
+
+Optional BIGANN-1M validation:
+
+```bash
+MEMORY_MONITOR=1 MEMORY_SAMPLE_SECONDS=0.2 \
+  bash scripts/test_lvc_disk_large_cache_smoke_bigann_1M.sh
+```
+
+For resuming the diagnostic run, set the same `OUTPUT_DIR` plus
+`RESUME=1 SKIP_BUILD=1`. Do not change the code/binary or sampling configuration
+between attempts within that output directory. ALP 400M fitting in an older
+binary does not guarantee the current lookup layout and allocation peak fit;
+the diagnostic launcher intentionally preserves the requested full cache.

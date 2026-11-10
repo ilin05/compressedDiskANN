@@ -13,6 +13,8 @@ bash "$repo/scripts/test_lvc_disk_large_cache_bigann_1B.sh"
 [[ ${DRY_RUN:-0} != 1 ]] || exit 0
 python3 - "$OUTPUT_DIR" <<'PY'
 import csv
+import json
+import os
 from pathlib import Path
 import sys
 out = Path(sys.argv[1])
@@ -28,6 +30,16 @@ with (out / 'summary.csv').open(newline='') as stream:
     searches = list(csv.DictReader(stream))
 assert len(searches) == 6
 assert all(r['status'] == 'ok' and r['measured_rounds'] == '1' for r in searches)
+if os.environ.get('MEMORY_MONITOR') == '1':
+    for row in rows:
+        case = out / row['case']
+        done = json.loads((case / 'done.json').read_text())
+        attempt = case / ('attempt_' + str(done['rows'][0]['attempt']))
+        samples = list(csv.DictReader((attempt / 'memory_samples.csv').open()))
+        assert samples and all(s['pid'] for s in samples)
+        assert len(list(csv.DictReader((attempt / 'memory_rounds.csv').open()))) == 4
+        assert json.loads((attempt / 'memory_summary.json').read_text())['memory_samples'] == len(samples)
+    print('PASS process memory/swap samples and per-round diagnostic outputs')
 print('PASS three explicit cases, resident-footprint sums, native payload verification, complete query rounds')
 print('Results:', out)
 PY

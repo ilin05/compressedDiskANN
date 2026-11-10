@@ -15,6 +15,7 @@ import subprocess
 import time
 
 from lvc_disk_sampled_budget import budget_from_log, forest_from_log
+from lvc_process_memory import run_monitored
 
 CODECS = ("raw", "alp", "dexor", "gorilla", "elf")
 FIELDS = ("case", "codec", "nodes", "status", "error", "attempt", "exit_code", "L", "rounds", "measured_rounds",
@@ -28,6 +29,9 @@ FIELDS = ("case", "codec", "nodes", "status", "error", "attempt", "exit_code", "
           "alp_encode_threads", "lvc_build_threads", "query_threads", "beamwidth", "source_dir")
 FIELDS += ("actual_cached_nodes", "footprint_status", "cached_data_bytes", "cached_data_gib",
            "vector_record_bytes", "nhood_buckets", "coord_buckets")
+MEMORY_FIELDS = ("memory_samples", "memory_sample_errors", "sampled_peak_rss_kib", "sampled_peak_swap_kib",
+                 "sampled_min_mem_available_kib", "system_swapin_bytes", "system_swapout_bytes")
+FIELDS += MEMORY_FIELDS
 FOOTPRINT_FIELDS = ("case", "codec", "nodes", "actual_cached_nodes", "status", "footprint_status", "error",
                     "adjacency_bytes", "payload_bytes", "record_metadata_bytes", "state_cache_bytes",
                     "vector_record_bytes", "cached_data_bytes", "cached_data_gib", "lookup_bytes",
@@ -170,7 +174,11 @@ def main():
     p.add_argument("--resume", action="store_true")
     p.add_argument("--verify-cache", action="store_true")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--memory-monitor", action="store_true", help="Sample target /proc memory and host swap counters")
+    p.add_argument("--memory-sample-seconds", type=float, default=5.0)
     args=p.parse_args()
+    if not math.isfinite(args.memory_sample_seconds) or args.memory_sample_seconds < 0.2:
+        p.error("Memory sampling interval must be finite and at least 0.2 seconds")
     if args.cases:
         if args.nodes is not None or args.codecs is not None:
             p.error("--cases cannot be combined with --nodes or --codecs")
@@ -223,6 +231,9 @@ def main():
                         "rounds":args.rounds,"beamwidth":args.beamwidth,"verify_cache":args.verify_cache}}
     if args.cases:
         identity["config"]["cases"] = [list(case) for case in cases]
+    if args.memory_monitor:
+        identity["inputs"]["memory_monitor"] = file_identity(Path(__file__).with_name("lvc_process_memory.py"))
+        identity["config"].update(memory_monitor=True, memory_sample_seconds=args.memory_sample_seconds)
     args.output.mkdir(parents=True,exist_ok=True)
     print("Output directory:",args.output,flush=True)
     with (args.output/".lock").open("w") as lock:
@@ -248,14 +259,19 @@ def main():
                 cmd=command(codec,nodes,run_dir); (run_dir/"command.txt").write_text(shlex.join(cmd)+"\n")
                 print("RUN",tag,"attempt",attempt,flush=True)
                 start=time.monotonic()
+                memory_report = {}
                 with (run_dir/"search.log").open("w") as log:
-                    result=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT)
+                    if args.memory_monitor:
+                        result, memory_report = run_monitored(cmd, log, run_dir, args.memory_sample_seconds)
+                    else:
+                        result=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT)
                 wall=time.monotonic()-start
                 base=dict(case=tag,codec=codec,nodes=nodes,attempt=attempt,exit_code=result.returncode,
                           process_wall_seconds=wall,cache_load_threads=args.load_threads,
                           alp_encode_threads=args.load_threads if codec=="alp" else 0,
                           lvc_build_threads=args.load_threads if codec in ("dexor","gorilla","elf") else 0,
                           query_threads=1,beamwidth=args.beamwidth,source_dir=str(run_dir),footprint_status="unavailable")
+                base.update({key: memory_report.get(key, "") for key in MEMORY_FIELDS})
                 try:
                     text=(run_dir/"search.log").read_text(errors="replace")
                     if "INDEX_MEMORY " in text:
