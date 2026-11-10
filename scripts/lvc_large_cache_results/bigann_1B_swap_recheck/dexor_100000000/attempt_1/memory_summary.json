@@ -1,0 +1,13 @@
+{
+  "memory_samples": 2092,
+  "memory_sample_errors": 0,
+  "sampled_peak_rss_kib": 226252984.0,
+  "sampled_peak_swap_kib": 3856972.0,
+  "sampled_min_mem_available_kib": 24761712.0,
+  "system_swapin_bytes": 264654848.0,
+  "system_swapout_bytes": 5311123456.0,
+  "pid": 3115743,
+  "sample_interval_seconds": 5.0,
+  "system_counters_scope": "whole host; other processes may contribute",
+  "peaks_scope": "periodic samples, not guaranteed lifetime maxima"
+}
