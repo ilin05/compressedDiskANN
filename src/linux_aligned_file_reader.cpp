@@ -114,6 +114,7 @@ void LinuxAlignedFileReader::register_thread()
     params.sq_thread_idle = 2000;
     
     int ret = io_uring_queue_init_params(MAX_EVENTS, ring, &params);
+    const bool sqpoll_enabled = ret == 0;
     if (ret != 0)
     {
         // Fallback to normal io_uring if SQPOLL is not supported
@@ -126,6 +127,7 @@ void LinuxAlignedFileReader::register_thread()
         }
     }
 
+    diskann::cout << "IO_BACKEND io_uring sqpoll=" << sqpoll_enabled << std::endl;
     diskann::cout << "allocating ctx: " << ring << " to thread-id:" << my_id << std::endl;
     ctx_map[my_id] = ring;
     lk.unlock();

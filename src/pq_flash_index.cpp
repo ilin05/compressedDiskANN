@@ -36,11 +36,12 @@ namespace
     template <typename Codec>
     uint64_t decode_lvc_cache_record(const lvc::RecordStore<Codec> &store, uint32_t id,
                                      const lvc::RootStateCache<Codec> *cache,
-                                     float *output, uint64_t &records, bool &cache_hit)
+                                     float *output, uint64_t &records, bool &cache_hit, bool profile)
     {
         thread_local std::vector<typename Codec::StateType> states;
         uint64_t bytes = 0;
-        store.decode(id, output, states, cache, &records, &bytes, &cache_hit);
+        store.decode(id, output, states, cache, profile ? &records : nullptr,
+                     profile ? &bytes : nullptr, profile ? &cache_hit : nullptr);
         return bytes;
     }
 
@@ -600,22 +601,25 @@ void PQFlashIndex<T, LabelT>::decode_cache_vector(uint32_t node_id, T *output, Q
         std::memcpy(output, _compressed_coord_cache.data() + position, _data_dim * sizeof(T));
         std::fill(output + _data_dim, output + _aligned_dim, T{});
     } else if constexpr (std::is_same_v<T, float>) {
-        Timer decode_timer;
+        const bool profile = _lvc_decode_profile && stats != nullptr;
+        const auto decode_start = profile ? std::chrono::steady_clock::now()
+                                          : std::chrono::steady_clock::time_point{};
         uint64_t records = 0, bytes = 0;
         bool state_hit = false;
         if (_cache_payload_mode == 2) bytes = decode_lvc_cache_record(*_dexor_cache, position,
-            _dexor_state_cache.get(), output, records, state_hit);
+            _dexor_state_cache.get(), output, records, state_hit, profile);
         else if (_cache_payload_mode == 3) bytes = decode_lvc_cache_record(*_gorilla_cache, position,
-            _gorilla_state_cache.get(), output, records, state_hit);
+            _gorilla_state_cache.get(), output, records, state_hit, profile);
         else bytes = decode_lvc_cache_record(*_elf_cache, position,
-            _elf_state_cache.get(), output, records, state_hit);
+            _elf_state_cache.get(), output, records, state_hit, profile);
         std::fill(output + _data_dim, output + _aligned_dim, T{});
-        if (stats != nullptr) {
+        if (profile) {
             ++stats->lvc_decode_calls;
             stats->lvc_state_cache_hits += state_hit;
             stats->lvc_replay_hops += records;
             stats->lvc_decode_bytes += bytes;
-            stats->lvc_decode_us += static_cast<float>(decode_timer.elapsed());
+            stats->lvc_decode_us += static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - decode_start).count());
         }
     }
 }

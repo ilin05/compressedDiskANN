@@ -66,6 +66,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     // 0=ALP (existing default), 1=Raw F32, 2=DeXOR, 3=Gorilla, 4=Elf.
     DISKANN_DLLEXPORT void set_cache_payload_mode(uint32_t mode, bool verify = false);
     DISKANN_DLLEXPORT void set_lvc_state_cache_ratio(float ratio);
+    void set_lvc_decode_profile(bool enabled) { _lvc_decode_profile = enabled; }
     DISKANN_DLLEXPORT void set_lvc_chain_max(int chain_max);
     DISKANN_DLLEXPORT void set_lvc_build_threads(int threads);
     DISKANN_DLLEXPORT void set_alp_encode_threads(int threads);
@@ -245,6 +246,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     CacheCoordLookup _coord_cache; // maps node id to byte offset
     uint32_t _cache_payload_mode = 0;
     bool _verify_cache_payload = false;
+    bool _lvc_decode_profile = true;
     float _lvc_state_cache_ratio = 0.01f;
     int _lvc_chain_max = 2;
     int _lvc_build_threads = 1;

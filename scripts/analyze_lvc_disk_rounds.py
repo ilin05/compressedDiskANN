@@ -28,6 +28,10 @@ def analyze(source, output_dir, expected_rounds, levels):
         rows = list(csv.DictReader(handle))
     if not rows:
         raise ValueError("No completed query rounds in " + str(source))
+    warmups = [row for row in rows if row.get("phase") == "warmup"]
+    rows = [row for row in rows if row.get("phase", "measurement") == "measurement"]
+    if not rows:
+        raise ValueError("No completed measured rounds in " + str(source))
     groups = defaultdict(list)
     seen = set()
     for row in rows:
@@ -40,7 +44,7 @@ def analyze(source, output_dir, expected_rounds, levels):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("Invalid " + field + " in " + str(key))
         groups[key[0]].append(row)
-    summary, flagged = [], []
+    summary, flagged, blocks = [], [], []
     for level, group in sorted(groups.items()):
         group.sort(key=lambda row: int(row["round"]))
         qps = [float(row["qps"]) for row in group]
@@ -58,6 +62,8 @@ def analyze(source, output_dir, expected_rounds, levels):
         others = [float(row["qps"]) for row in group if int(row["round"]) != 1]
         summary.append(dict(
             L=level, completed_rounds=len(group), expected_rounds=expected_rounds,
+            warmup_rounds=sum(int(row["L"]) == level for row in warmups),
+            lvc_decode_profile=group[0].get("lvc_decode_profile", ""),
             complete={int(row["round"]) for row in group} == set(range(1, expected_rounds + 1)),
             qps_mean=statistics.mean(qps), qps_median=statistics.median(qps),
             qps_min=min(qps), qps_max=max(qps),
@@ -77,13 +83,31 @@ def analyze(source, output_dir, expected_rounds, levels):
             max_current_rss_gib=max(int(row["current_rss_kib"]) for row in group) / 2**20,
             total_minor_faults=sum(int(row["minor_faults"] or 0) for row in group),
             total_major_faults=sum(int(row["major_faults"] or 0) for row in group),
+            system_swap_in_pages=sum(int(row.get("system_swap_in_pages", 0) or 0) for row in group),
+            system_swap_out_pages=sum(int(row.get("system_swap_out_pages", 0) or 0) for row in group),
+            max_process_swap_kib=max(int(row.get("process_swap_kib", 0) or 0) for row in group),
+            mean_us_std=statistics.stdev(latency) if len(latency) > 1 else 0,
+            mean_us_p05=quantile(latency, .05), mean_us_p95=quantile(latency, .95),
             slow_wall_rounds=sum(wall > wall_fence for wall in wall_per_query),
             slow_query_latency_rounds=sum(mean > latency_fence for mean in latency)))
+        for block_index in sorted({(int(row["round"]) - 1) // 10 for row in group}):
+            block = [row for row in group if (int(row["round"]) - 1) // 10 == block_index]
+            blocks.append(dict(L=level, first_round=block_index * 10 + 1,
+                               last_round=(block_index + 1) * 10, completed_rounds=len(block),
+                               aggregate_qps=sum(int(row["queries"]) for row in block) /
+                                             sum(float(row["wall_seconds"]) for row in block),
+                               mean_us=statistics.mean(float(row["mean_us"]) for row in block),
+                               mean_ios=statistics.mean(float(row["mean_ios"]) for row in block),
+                               major_faults=sum(int(row["major_faults"] or 0) for row in block)))
     output_dir.mkdir(parents=True, exist_ok=True)
     write_csv(output_dir / "summary.csv", summary)
     write_csv(output_dir / "rounds_flagged.csv", flagged)
+    write_csv(output_dir / "blocks.csv", blocks)
+    if warmups:
+        write_csv(output_dir / "warmup_rounds.csv", warmups)
     complete = (set(groups) == set(levels) and all(row["complete"] for row in summary))
-    print("COMPLETE" if complete else "PARTIAL", str(source), "rounds=" + str(len(rows)))
+    print("COMPLETE" if complete else "PARTIAL", str(source), "rounds=" + str(len(rows)),
+          "warmups=" + str(len(warmups)))
     for row in summary:
         print("L={L} rounds={completed_rounds} QPS mean={qps_mean:.2f} median={qps_median:.2f} "
               "aggregate={aggregate_qps:.2f} CV={qps_cv:.3f} max_mean_us={max_round_mean_us:.2f}"
