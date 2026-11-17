@@ -13,7 +13,7 @@ warmups=${WARMUP_ROUNDS:-3}
 load_threads=${LVC_BUILD_THREADS:-32}
 profile=${LVC_DECODE_PROFILE:-0}
 beamwidth=${BEAMWIDTH:-2}
-read -r -a counts <<< "${CACHE_NODES_LIST:-10000000 25000000}"
+read -r -a counts <<< "${CACHE_NODES_LIST:-10000000 25000000 50000000}"
 read -r -a levels <<< "${L_VALUES:-1 2 3 4 5 6 8 10}"
 # Same query CPU across cache sizes. Override with a quiet, allowed physical CPU.
 search_cpu=${SEARCH_CPU:-$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')}
