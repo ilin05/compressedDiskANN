@@ -671,7 +671,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     }
 
     diskann::cout << "Done searching. Now saving results " << std::endl;
-    for (const auto &result : deferred_results) {
+    for (auto &result : deferred_results) {
         diskann::save_bin<uint32_t>(result.prefix + "_idx_uint32.bin", result.ids.data(), query_num, recall_at);
         diskann::save_bin<float>(result.prefix + "_dists_float.bin", result.distances.data(), query_num, recall_at);
     }
