@@ -1,0 +1,2 @@
+graph_bytes,lookup_bytes,payload_bytes,metadata_bytes,state_cache_bytes,cached_footprint_without_lookup_bytes,cached_footprint_with_lookup_bytes
+6600000000,30064771072,9049254650,1200000000,3368161928,20217416578,50282187650

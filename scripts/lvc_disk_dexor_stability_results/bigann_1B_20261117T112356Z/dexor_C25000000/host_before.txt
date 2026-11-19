@@ -1,0 +1,321 @@
+Tue Nov 17 01:13:03 PM UTC 2026
+Linux zju 6.8.0-147-generic #147-Ubuntu SMP PREEMPT_DYNAMIC Thu Sep 24 11:33:16 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+f77d1d43ff088203ae1c45c0693ff27695a1bd5a
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           46 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  56
+On-line CPU(s) list:                     0-55
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+CPU family:                              6
+Model:                                   79
+Thread(s) per core:                      2
+Core(s) per socket:                      14
+Socket(s):                               2
+Stepping:                                1
+CPU(s) scaling MHz:                      44%
+CPU max MHz:                             3300.0000
+CPU min MHz:                             1200.0000
+BogoMIPS:                                4800.35
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d ibpb_exit_to_user
+Virtualization:                          VT-x
+L1d cache:                               896 KiB (28 instances)
+L1i cache:                               896 KiB (28 instances)
+L2 cache:                                7 MiB (28 instances)
+L3 cache:                                70 MiB (2 instances)
+NUMA node(s):                            2
+NUMA node0 CPU(s):                       0-13,28-41
+NUMA node1 CPU(s):                       14-27,42-55
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             KVM: Mitigation: VMX disabled
+Vulnerability L1tf:                      Mitigation; PTE Inversion; VMX conditional cache flushes, SMT vulnerable
+Vulnerability Mds:                       Mitigation; Clear CPU buffers; SMT vulnerable
+Vulnerability Meltdown:                  Mitigation; PTI
+Vulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP conditional; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Mitigation; Clear CPU buffers; SMT vulnerable
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+               total        used        free      shared  buff/cache   available
+Mem:       263993264    18333340    54572456      135184   193078628   245659924
+Swap:        8388604      203884     8184720
+MemTotal:       263993264 kB
+MemFree:        54572364 kB
+MemAvailable:   245658824 kB
+Buffers:         1976728 kB
+Cached:         181195552 kB
+SwapCached:        48580 kB
+Active:         26854668 kB
+Inactive:       168517528 kB
+Active(anon):   12232772 kB
+Inactive(anon):   109692 kB
+Active(file):   14621896 kB
+Inactive(file): 168407836 kB
+Unevictable:       30652 kB
+Mlocked:           27584 kB
+SwapTotal:       8388604 kB
+SwapFree:        8184720 kB
+Zswap:                 0 kB
+Zswapped:              0 kB
+Dirty:             35432 kB
+Writeback:             0 kB
+AnonPages:      12225864 kB
+Mapped:          3924740 kB
+Shmem:            135184 kB
+KReclaimable:    9906348 kB
+Slab:           11536204 kB
+SReclaimable:    9906348 kB
+SUnreclaim:      1629856 kB
+KernelStack:       58688 kB
+PageTables:       128248 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    140385236 kB
+Committed_AS:   42796068 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:      580764 kB
+VmallocChunk:          0 kB
+Percpu:           395136 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:      2048 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+Unaccepted:            0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:    18193676 kB
+DirectMap2M:    201893888 kB
+DirectMap1G:    50331648 kB
+nr_free_pages 13643721
+nr_zone_inactive_anon 27423
+nr_zone_active_anon 3058193
+nr_zone_inactive_file 42102085
+nr_zone_active_file 3655474
+nr_zone_unevictable 7663
+nr_zone_write_pending 8858
+nr_mlock 6896
+nr_bounce 0
+nr_zspages 0
+nr_free_cma 0
+nr_unaccepted 0
+numa_hit 41295082700
+numa_miss 1657457637
+numa_foreign 1657455323
+numa_interleave 966
+numa_local 41279979308
+numa_other 1658186743
+nr_inactive_anon 27423
+nr_active_anon 3058193
+nr_inactive_file 42102085
+nr_active_file 3655474
+nr_unevictable 7663
+nr_slab_reclaimable 2476587
+nr_slab_unreclaimable 407464
+nr_isolated_anon 109
+nr_isolated_file 682
+workingset_nodes 455282
+workingset_refault_anon 387059
+workingset_refault_file 21687754702
+workingset_activate_anon 206247
+workingset_activate_file 3170636113
+workingset_restore_anon 206085
+workingset_restore_file 3165075543
+workingset_nodereclaim 5009572
+nr_anon_pages 3056466
+nr_mapped 981185
+nr_file_pages 45805215
+nr_dirty 8858
+nr_writeback 0
+nr_writeback_temp 0
+nr_shmem 33796
+nr_shmem_hugepages 0
+nr_shmem_pmdmapped 0
+nr_file_hugepages 0
+nr_file_pmdmapped 0
+nr_anon_transparent_hugepages 1
+nr_vmscan_write 12016758
+nr_vmscan_immediate_reclaim 10
+nr_dirtied 256407900
+nr_written 255920954
+nr_throttled_written 0
+nr_kernel_misc_reclaimable 0
+nr_foll_pin_acquired 2150704792
+nr_foll_pin_released 2150676626
+nr_kernel_stack 58688
+nr_page_table_pages 32062
+nr_sec_page_table_pages 0
+nr_swapcached 12145
+pgpromote_success 0
+pgpromote_candidate 0
+pgdemote_kswapd 0
+pgdemote_direct 0
+pgdemote_khugepaged 0
+nr_dirty_threshold 11820314
+nr_dirty_background_threshold 5902941
+pgpgin 106594898867
+pgpgout 1314516761
+pswpin 4602195
+pswpout 12016329
+pgalloc_dma 1024
+pgalloc_dma32 11228434
+pgalloc_normal 44058377781
+pgalloc_movable 0
+pgalloc_device 0
+allocstall_dma 0
+allocstall_dma32 0
+allocstall_normal 2094
+allocstall_movable 655809
+allocstall_device 0
+pgskip_dma 0
+pgskip_dma32 13389
+pgskip_normal 727199
+pgskip_movable 0
+pgskip_device 0
+pgfree 44249738948
+pgactivate 2456928921
+pgdeactivate 0
+pglazyfree 419411
+pgfault 30723943378
+pgmajfault 333058681
+pglazyfreed 677
+pgrefill 1642352526
+pgreuse 716387226
+pgsteal_kswapd 335148901
+pgsteal_direct 15273155
+pgsteal_khugepaged 76950
+pgscan_kswapd 462602760
+pgscan_direct 218718447
+pgscan_khugepaged 77479
+pgscan_direct_throttle 2860
+pgscan_anon 120485349
+pgscan_file 27622117284
+pgsteal_anon 12097717
+pgsteal_file 24585489844
+zone_reclaim_failed 0
+pginodesteal 9682
+slabs_scanned 1451219657
+kswapd_inodesteal 215736
+kswapd_low_wmark_hit_quickly 6555
+kswapd_high_wmark_hit_quickly 147702
+pageoutrun 159241
+pgrotated 12154221
+drop_pagecache 0
+drop_slab 0
+oom_kill 224
+numa_pte_updates 12084225312
+numa_huge_pte_updates 1620284
+numa_hint_faults 9626764083
+numa_hint_faults_local 7456380507
+numa_pages_migrated 658710935
+pgmigrate_success 818428165
+pgmigrate_fail 61202616
+thp_migration_success 19555
+thp_migration_fail 37512
+thp_migration_split 0
+compact_migrate_scanned 2541718288
+compact_free_scanned 16998743164
+compact_isolated 364656709
+compact_stall 193501
+compact_fail 184717
+compact_success 8784
+compact_daemon_wake 11138
+compact_daemon_migrate_scanned 2399757607
+compact_daemon_free_scanned 16025875716
+htlb_buddy_alloc_success 0
+htlb_buddy_alloc_fail 0
+unevictable_pgs_culled 69668
+unevictable_pgs_scanned 768
+unevictable_pgs_rescued 26036
+unevictable_pgs_mlocked 32164
+unevictable_pgs_munlocked 13819
+unevictable_pgs_cleared 0
+unevictable_pgs_stranded 11449
+thp_fault_alloc 1376410
+thp_fault_fallback 7174
+thp_fault_fallback_charge 0
+thp_collapse_alloc 3317
+thp_collapse_alloc_failed 93
+thp_file_alloc 0
+thp_file_fallback 0
+thp_file_fallback_charge 0
+thp_file_mapped 0
+thp_split_page 12
+thp_split_page_failed 0
+thp_deferred_split_page 1687
+thp_split_pmd 1706
+thp_scan_exceed_none_pte 5536
+thp_scan_exceed_swap_pte 4
+thp_scan_exceed_share_pte 0
+thp_split_pud 0
+thp_zero_page_alloc 1
+thp_zero_page_alloc_failed 0
+thp_swpout 0
+thp_swpout_fallback 0
+balloon_inflate 0
+balloon_deflate 0
+balloon_migrate 0
+swap_ra 1854159
+swap_ra_hit 1634013
+ksm_swpin_copy 2
+cow_ksm 0
+zswpin 0
+zswpout 0
+zswpwb 0
+direct_map_level2_splits 8867
+direct_map_level3_splits 205
+nr_unstable 0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=36330693063
+full avg10=0.00 avg60=0.00 avg300=0.00 total=34763931429
+some avg10=0.00 avg60=0.00 avg300=0.00 total=7086821646
+full avg10=0.00 avg60=0.00 avg300=0.00 total=6302598725
+    PID COMMAND         %CPU %MEM
+2807050 python           117  0.7
+2806705 python           117  0.8
+2806896 python           117  0.8
+ 253140 python          64.5  0.8
+2872859 gpustat         32.0  0.0
+2807593 htop             8.8  0.0
+ 700190 opencode         3.0  0.1
+ 219780 nv_queue         2.2  0.0
+ 219842 nv_queue         2.2  0.0
+1513045 loki             2.1  0.0
+1517759 otelcol-contrib  1.8  0.0
+ 220060 nv_queue         1.6  0.0
+ 219959 nv_queue         1.4  0.0
+ 993599 grafana          1.3  0.1
+   2092 dockerd          1.2  0.0
+ 190719 MainThread       1.1  0.1
+1512543 prometheus       1.0  0.0
+3579679 python           1.0  0.0
+3579680 python           1.0  0.0
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+schedutil
+/sys/kernel/mm/transparent_hugepage/enabled
+always [madvise] never
+/proc/sys/vm/swappiness
+60
+BLIS_NUM_THREADS=1
+GOMP_SPINCOUNT=0
+MKL_NUM_THREADS=1
+OMP_DYNAMIC=FALSE
+OMP_NUM_THREADS=32
+OMP_PROC_BIND=FALSE
+OMP_WAIT_POLICY=PASSIVE
+OPENBLAS_NUM_THREADS=1
