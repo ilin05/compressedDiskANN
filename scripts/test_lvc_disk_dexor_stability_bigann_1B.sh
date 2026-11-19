@@ -10,6 +10,7 @@ gt=${GT_FILE:-"$data/bigann_1B_gt.bin"}
 out=${OUTPUT_DIR:-"$repo/scripts/lvc_disk_dexor_stability_results/bigann_1B_$(date -u +%Y%m%dT%H%M%SZ)"}
 rounds=${ROUNDS:-50}
 warmups=${WARMUP_ROUNDS:-3}
+checkpoint_rounds=${CHECKPOINT_ROUNDS:-0}
 load_threads=${LVC_BUILD_THREADS:-32}
 profile=${LVC_DECODE_PROFILE:-0}
 beamwidth=${BEAMWIDTH:-2}
@@ -17,7 +18,7 @@ read -r -a counts <<< "${CACHE_NODES_LIST:-10000000 25000000 50000000}"
 read -r -a levels <<< "${L_VALUES:-1 2 3 4 5 6 8 10}"
 # Same query CPU across cache sizes. Override with a quiet, allowed physical CPU.
 search_cpu=${SEARCH_CPU:-$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')}
-python3 - "$rounds" "$warmups" "$load_threads" "$profile" "$search_cpu" "${counts[*]}" "${levels[*]}" "$beamwidth" <<'PY'
+python3 - "$rounds" "$warmups" "$load_threads" "$profile" "$search_cpu" "${counts[*]}" "${levels[*]}" "$beamwidth" "$checkpoint_rounds" <<'PY'
 import os, sys
 r, w, t, p, cpu = map(int, sys.argv[1:6])
 counts, levels = [list(map(int, value.split())) for value in sys.argv[6:8]]
@@ -25,6 +26,8 @@ if not 0 < int(sys.argv[8]) < 2**32:
     raise SystemExit('BEAMWIDTH must be a positive integer')
 if not (0 < r < 2**32 and 0 <= w < 2**32-r and t > 0 and p in (0, 1)):
     raise SystemExit('Invalid rounds, warmup, thread count or profile setting')
+if not 0 <= int(sys.argv[9]) < r:
+    raise SystemExit('CHECKPOINT_ROUNDS must be 0 or a positive integer less than ROUNDS')
 if not counts or len(set(counts)) != len(counts) or min(counts) < 1 or max(counts) > 500000000:
     raise SystemExit('CACHE_NODES_LIST must contain distinct counts in [1, 500000000]')
 if not levels or len(set(levels)) != len(levels) or min(levels) < 1:
@@ -42,6 +45,11 @@ out=$(cd -- "$out" && pwd)
 [[ ! -e "$out/run_config.txt" ]] || { echo "Existing run: choose a fresh OUTPUT_DIR" >&2; exit 1; }
 printf 'rounds=%s\nwarmup_rounds=%s\ncache_nodes=%s\nL=%s\nsearch_cpu=%s\nlvc_decode_profile=%s\n' \
     "$rounds" "$warmups" "${counts[*]}" "${levels[*]}" "$search_cpu" "$profile" > "$out/run_config.txt"
+checkpoint_args=()
+if (( checkpoint_rounds > 0 )); then
+    checkpoint_args=(--round_checkpoint "$checkpoint_rounds")
+    printf 'checkpoint_rounds=%s\n' "$checkpoint_rounds" >> "$out/run_config.txt"
+fi
 # No active spinning by idle construction workers; ordinary QueryStats remain enabled.
 export OMP_NUM_THREADS="$load_threads" OMP_DYNAMIC=FALSE OMP_WAIT_POLICY=PASSIVE GOMP_SPINCOUNT=0
 export OMP_PROC_BIND=FALSE
@@ -62,6 +70,10 @@ if [[ ${DRY_RUN:-0} != 1 ]]; then
     for flag in lvc_decode_profile warmup_rounds defer_round_results search_cpu per_round_csv; do
         grep -q -- "--$flag" "$out/binary_help.txt" || { echo "Rebuild updated binary: missing --$flag" >&2; exit 1; }
     done
+    if (( checkpoint_rounds > 0 )) && ! grep -q -- '--round_checkpoint' "$out/binary_help.txt"; then
+        echo 'Rebuild updated binary: missing --round_checkpoint' >&2
+        exit 1
+    fi
     if [[ ${ALLOW_OTHER_SEARCH:-0} != 1 ]]; then
         python3 - <<'PY'
 from pathlib import Path
@@ -116,7 +128,7 @@ for nodes in "${counts[@]}"; do
         --lvc_state_cache_ratio 0.01 --cache_budget_include_state
         --lvc_decode_profile "$profile" --warmup_rounds "$warmups" --defer_round_results
         --search_cpu "$search_cpu" -K 1 -L "${levels[@]}" -T 1 -W "$beamwidth" -R "$rounds"
-        --result_path "$case_dir/search" --per_round_csv "$case_dir/rounds.csv")
+        --result_path "$case_dir/search" --per_round_csv "$case_dir/rounds.csv" "${checkpoint_args[@]}")
     {
         printf '#!/usr/bin/env bash\n'
         printf 'export OMP_NUM_THREADS=%q OMP_DYNAMIC=FALSE OMP_WAIT_POLICY=PASSIVE GOMP_SPINCOUNT=0\n' "$load_threads"
